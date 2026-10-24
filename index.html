@@ -229,7 +229,7 @@ body.dragging,body.dragging *{cursor:grabbing!important;user-select:none!importa
 <nav class="pages"><button id="nv1" class="on">📅 Planning</button><button id="nv2">🗓 À venir</button><button id="nv3">🏃 Prépa</button><button id="nv4">📊 Notes</button></nav>
 <div id="pgPlan"><div id="vbar"></div>
 <div id="msg"></div>
-<div class="tools"><button id="bell">🔔 Activer les rappels (1 h avant)</button><button id="d1">📆 Rappel la veille : désactivé</button><button id="ptg">🧩 Panneau</button><button id="flip" title="Inverser semaine A/B">A⇄B</button></div>
+<div class="tools"><button id="bell">🔔 Activer les rappels (1 h avant)</button><button id="d1">📆 Rappel la veille : désactivé</button><button id="ptg">🧩 Panneau</button><button id="flip" title="Inverser semaine A/B">A⇄B</button><button id="hidb" hidden></button></div>
 <div id="grid" style="margin-top:12px"></div>
 
 </div>
@@ -248,7 +248,7 @@ const JOURS=["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"];
 const MOIS=["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
 let S={ds:[],flip:false},off=0;
 try{const r=localStorage.getItem("plan-v1");if(r)S=JSON.parse(r)}catch(e){}
-function normS(){S.done=S.done||{};S.ev=S.ev||[];S.run=S.run||{start:"2026-11-09"};S.rem=S.rem||{d1:false};S.notes=S.notes||{};S.grades=S.grades||{};S.coef=S.coef||{};
+function normS(){S.hid=S.hid||{};S.hidR=S.hidR||{};S.done=S.done||{};S.ev=S.ev||[];S.run=S.run||{start:"2026-11-09"};S.rem=S.rem||{d1:false};S.notes=S.notes||{};S.grades=S.grades||{};S.coef=S.coef||{};
 if(!S.sv2){S.sv2=1;const B=["Maths","Physique-Chimie","Français","Anglais","Espagnol","Histoire-Géo","SVT","Enseignement scientifique"];S.subjects=B.concat((S.subjects||[]).filter(x=>!B.includes(x)&&x!="Philosophie"))}
 S.subjects=S.subjects||["Maths","Physique-Chimie","Français","Anglais","Histoire-Géo","SVT","Philosophie","Espagnol"];if(!S.vacs)S.vacs=[];if(!S.noSeed&&!S.vacs.some(v=>v.id=="toussaint"))S.vacs.push({id:"toussaint",name:"Vacances scolaires",a:"2026-10-19",b:"2026-11-01"});S.notified=S.notified||[];}normS();
 // ===== SYNCHRO SUPABASE (sans connexion : une seule ligne "oscar") =====
@@ -397,8 +397,10 @@ function evFor(d,out){
  S.ev.filter(x=>x.date==k).forEach(x=>{const kk=x.k||(x.m?"subj":"perso"),M=KM[kk]||KM.perso,ti=x.title.replace(/^Contrôle /,"");ev.push({s:T(x.s),e:T(x.e),t:evLbl(x),c:M[2],cid:x.id,nm:ti,tag:M[1].toUpperCase(),desc:x.desc||"",col:["subj","devoir","ctrl"].includes(kk)?subjCol(ti):null})});
  const pi=prepInfo(d,ev.last);if(pi)ev.push({s:pi.s,e:pi.s+.25,t:"Prépa 15 min : "+pi.short,c:"pre",nm:"Prépa · "+pi.n+" + 20 pompes · gainage 2'"});
  ev.forEach(e=>{e.key=k+"|"+(+e.s).toFixed(2)+"|"+e.c;if(!e.desc&&S.notes[e.key])e.desc=S.notes[e.key]});
- ev.sort((a,b)=>a.s-b.s);return ev;
+ const vis=ev.filter(e=>e.cid||e.all||!(S.hid[e.key]||S.hidR[rkey(e,i)]));
+ vis.sort((a,b)=>a.s-b.s);vis.last=ev.last;return vis;
 }
+const rkey=(e,dw)=>dw+"|"+(+e.s).toFixed(2)+"|"+e.c+"|"+(e.tag=="COURS"?e.nm:"");
 let dragged=0,qtv="",page=1,selD=midnight(new Date()),needCenter=true,sel=dowOf(new Date()),pick=null,dur=1.5,csv="",ptype="devoir";const SP={"@ten":"Entraînement de tennis","@match":"Match de tennis"},TL={subj:"Devoirs",devoir:"Devoirs",ctrl:"Contrôle"};
 const H0=6,H1=23,PX=88;let busy=false,hiT=null;
 const snap=h=>Math.round(h*4)/4;
@@ -446,7 +448,7 @@ const subjCol=t=>{let h=0;for(const c of String(t).toLowerCase())h=(h*31+c.charC
 function render(){
  const now=midnight(new Date()),mon=new Date(selD);mon.setDate(selD.getDate()-dowOf(selD));sel=dowOf(selD);
  const A=weekA(mon);$("ab").textContent=`Semaine ${A?"A (Q1 · ven. 8h)":"B (Q2 · ven. 9h)"} · S${isoWeek(mon)}${[0,1,2,3,4,5,6].some(i=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return isVac(d)})?" · 🏖️ vacances":""}`;
- const {out,warn}=plan(),g=$("grid");
+ const {out,warn}=plan(),g=$("grid");syncHid();
  const days=[];
  for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);days.push({d,k:F(d),vac:isVac(d),ev:evFor(d,out)})}
  {const td0=F(now),fm=d=>JOURS[dowOf(d)]+" "+d.getDate()+" "+MOIS[d.getMonth()],pd=s=>{const[a,b,c]=s.split("-");return new Date(+a,+b-1,+c)};
@@ -627,6 +629,13 @@ function renderRun(){
 
 const hmm=h=>p(Math.floor(h+1e-6))+":"+p(Math.round((h%1)*60));
 function closeMd(){$("md").hidden=true}
+function syncHid(){const n=Object.keys(S.hid).length+Object.keys(S.hidR).length,b=$("hidb");b.hidden=!n;b.textContent="↩️ Blocs supprimés ("+n+")"}
+function openHid(){
+ const L=[...Object.entries(S.hidR).map(([k,v])=>["r",k,v.t]),...Object.entries(S.hid).map(([k,v])=>["d",k,v.t])],m=$("md");
+ m.innerHTML=`<div class="mc"><h3>Blocs supprimés</h3><div class="mt">Clique sur ↩️ pour faire réapparaître un bloc.</div>${L.length?L.map((x,i)=>`<div class="li"><span>${esc(x[2])}</span><button data-u="${i}" title="Rétablir">↩️</button></div>`).join(""):"<div class=\"note\">Aucun bloc supprimé.</div>"}<div class="mbtn"><button id="mcl">Fermer</button></div></div>`;
+ m.hidden=false;$("mcl").onclick=closeMd;
+ m.querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>{const x=L[+b.dataset.u];if(x[0]=="r")delete S.hidR[x[1]];else delete S.hid[x[1]];save();refresh();openHid()})}
+$("hidb").onclick=openHid;
 document.addEventListener("keydown",e=>{if(e.key=="Escape")closeMd()});
 $("md").onclick=e=>{if(e.target.id=="md")closeMd()};
 function openMd(e){
@@ -639,10 +648,13 @@ function openMd(e){
  <label>Description${ev?"":" (note perso)"}<textarea id="mdsc" rows="3" placeholder="Ex : exercices 12 à 15 p. 84, à rendre jeudi">${esc(ev?ev.desc||"":S.notes[e.key]||"")}</textarea></label>
  ${ev?`<label>Heures de travail à répartir avant (pour un contrôle, optionnel)<input id="mh" type="number" min="0" step="0.5" value="${+ev.h||0}"></label>`:""}
  <div id="mer" class="warn"></div>
- <div class="mbtn">${ev?`<button id="mdel" class="danger">🗑 Supprimer</button>`:""}<button id="mcl">Fermer</button><button id="msv" class="pri">Enregistrer</button></div></div>`;
+ <div class="mbtn">${ev?`<button id="mdel" class="danger">🗑 Supprimer</button>`:(e.key&&!e.all?`<button id="mh1" class="danger">🗑 Supprimer ce jour</button><button id="mh2" class="danger" style="margin-right:0">🗑 Supprimer tous les ${JOURS[dowOf(pdate(e.key.split("|")[0]))]}s</button>`:"")}<button id="mcl">Fermer</button><button id="msv" class="pri">Enregistrer</button></div></div>`;
  m.hidden=false;
  $("mcl").onclick=closeMd;
  if(ev)$("mdel").onclick=()=>{S.ev=S.ev.filter(q=>q!==ev);save();closeMd();refresh();msg("🗑️ Bloc supprimé.")};
+ else if($("mh1")){const dk=e.key.split("|")[0],dw=dowOf(pdate(dk)),lb=(e.tag?e.tag+" · ":"")+(e.nm||e.t),hm=fmt(e.s)+"–"+fmt(e.e);
+  $("mh1").onclick=()=>{S.hid[e.key]={t:lb+" · "+dayLbl(dk)+" "+hm};save();closeMd();refresh();msg("🗑️ Bloc supprimé pour ce jour (↩️ Blocs supprimés pour le rétablir).")};
+  $("mh2").onclick=()=>{S.hidR[rkey(e,dw)]={t:"Chaque "+JOURS[dw]+" · "+lb+" "+hm};save();closeMd();refresh();msg("🗑️ Bloc supprimé pour tous les "+JOURS[dw]+"s (↩️ Blocs supprimés pour le rétablir).")}}
  $("msv").onclick=()=>{
   if(ev){const s0=$("ms").value,e0=$("me").value;if(!s0||!e0||T(e0)<=T(s0))return $("mer").textContent="L'heure de fin doit être après le début.";
    ev.title=$("mn").value.trim().slice(0,60)||ev.title;ev.k=$("mk").value;ev.m=ev.k=="subj"?1:0;ev.s=s0;ev.e=e0;if($("mdt").value)ev.date=$("mdt").value;ev.desc=$("mdsc").value.slice(0,400);ev.h=+$("mh").value||0}
