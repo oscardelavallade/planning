@@ -209,12 +209,23 @@ h1::after{content:"▍";margin-left:4px;-webkit-text-fill-color:var(--acc);anima
 [data-theme="aube"] .pages button.on,[data-theme="aube"] .tab.on,[data-theme="aube"] .seg button.on,[data-theme="aube"] #fab{background:linear-gradient(135deg,var(--rev),var(--ds))}
 .warn{color:var(--ds);font-size:13px;margin-top:6px}
 .leg{font-size:12px;color:var(--mu);margin-top:8px}
+
+/* ===== GLISSER-DÉPOSER ===== */
+.chip,.bl{user-select:none;-webkit-user-select:none}
+@media(pointer:fine){.chip{cursor:grab}}
+body.dragging,body.dragging *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}
+#dgl{display:none;position:fixed;z-index:60;pointer-events:none;background:#15131f;color:#fff;border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:5px 10px;font:600 12.5px "JetBrains Mono",ui-monospace,monospace;box-shadow:0 8px 24px rgba(0,0,0,.5);white-space:nowrap}
+.ghost{position:absolute;left:6px;right:4px;z-index:5;display:none;align-items:center;justify-content:center;pointer-events:none;border:2px dashed var(--c,#9b8cff);border-radius:16px;background:color-mix(in srgb,var(--c,#9b8cff) 24%,transparent);color:var(--tx);font:700 13px "JetBrains Mono",ui-monospace,monospace}
+.bl.ghosted{opacity:.35}
+.strip.stk{position:sticky;z-index:7;background:rgba(20,18,32,.95);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.4);backdrop-filter:blur(12px)}
+[data-theme="aube"] .strip.stk{background:rgba(255,255,255,.96);box-shadow:0 8px 24px rgba(80,60,120,.22)}
+.tab.dropt{box-shadow:0 0 0 3px var(--ds);transform:scale(1.08)}
 </style></head><body>
 <div id="toast"></div>
 <div id="md" hidden></div>
 <button id="fab" title="Placer un bloc">🧩</button>
 <div class="wrap">
-<header><div><h1>Mon planning</h1><span class="badge" id="ab"></span></div><div class="themes"><button data-th="nuit">🌙 Nuit</button><button data-th="aube">☀️ Aube</button></div></header>
+<header><div><h1>Mon planning</h1><span class="badge" id="ab"></span> <span class="badge" id="syn" style="cursor:pointer" title="Cliquer pour resynchroniser"></span></div><div class="themes"><button data-th="nuit">🌙 Nuit</button><button data-th="aube">☀️ Aube</button></div></header>
 <nav class="pages"><button id="nv1" class="on">📅 Planning</button><button id="nv2">🗓 À venir</button><button id="nv3">🏃 Prépa</button><button id="nv4">📊 Notes</button></nav>
 <div id="pgPlan"><div id="vbar"></div>
 <div id="msg"></div>
@@ -237,10 +248,58 @@ const JOURS=["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"];
 const MOIS=["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
 let S={ds:[],flip:false},off=0;
 try{const r=localStorage.getItem("plan-v1");if(r)S=JSON.parse(r)}catch(e){}
-S.done=S.done||{};S.ev=S.ev||[];S.run=S.run||{start:"2026-11-09"};S.rem=S.rem||{d1:false};S.notes=S.notes||{};S.grades=S.grades||{};S.coef=S.coef||{};
+function normS(){S.done=S.done||{};S.ev=S.ev||[];S.run=S.run||{start:"2026-11-09"};S.rem=S.rem||{d1:false};S.notes=S.notes||{};S.grades=S.grades||{};S.coef=S.coef||{};
 if(!S.sv2){S.sv2=1;const B=["Maths","Physique-Chimie","Français","Anglais","Espagnol","Histoire-Géo","SVT","Enseignement scientifique"];S.subjects=B.concat((S.subjects||[]).filter(x=>!B.includes(x)&&x!="Philosophie"))}
-S.subjects=S.subjects||["Maths","Physique-Chimie","Français","Anglais","Histoire-Géo","SVT","Philosophie","Espagnol"];if(!S.vacs)S.vacs=[];if(!S.noSeed&&!S.vacs.some(v=>v.id=="toussaint"))S.vacs.push({id:"toussaint",name:"Vacances scolaires",a:"2026-10-19",b:"2026-11-01"});S.notified=S.notified||[];
-const save=()=>{try{localStorage.setItem("plan-v1",JSON.stringify(S))}catch(e){}};
+S.subjects=S.subjects||["Maths","Physique-Chimie","Français","Anglais","Histoire-Géo","SVT","Philosophie","Espagnol"];if(!S.vacs)S.vacs=[];if(!S.noSeed&&!S.vacs.some(v=>v.id=="toussaint"))S.vacs.push({id:"toussaint",name:"Vacances scolaires",a:"2026-10-19",b:"2026-11-01"});S.notified=S.notified||[];}normS();
+// ===== SYNCHRO SUPABASE (sans connexion : une seule ligne "oscar") =====
+const SB="https://eoiylihotdwlcesumgox.supabase.co/rest/v1/planning_state",SBK="sb_publishable_-L-wByCrupoK7sHbu123ig_wz75sHU7",SBH={apikey:SBK,"Content-Type":"application/json"};
+let pushT=0,pushing=false,again=false,pulling=false;
+const meta=()=>{try{return JSON.parse(localStorage.getItem("plan-meta"))||{}}catch(e){return{}}};
+const setMeta=m=>{try{localStorage.setItem("plan-meta",JSON.stringify({...meta(),...m}))}catch(e){}};
+const payload=()=>{const o={...S};delete o.theme;delete o.palOpen;delete o.notified;return o};
+function syn(t,warn){const e=$("syn");if(!e)return;e.textContent=t;e.style.color=warn?"var(--ds)":""}
+const synOk=()=>syn("☁️ synchronisé");
+const synOff=()=>syn(navigator.onLine?"⚠️ synchro impossible · copie locale":"📴 hors ligne · copie locale",1);
+async function push(){
+ if(pushing){again=true;return}
+ pushing=true;syn("⏳ synchro…");const ts=meta().ts||Date.now();
+ try{
+  const r=await fetch(SB,{method:"POST",headers:{...SBH,Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:"oscar",data:payload(),updated_at:new Date(ts).toISOString()})});
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  if(meta().ts==ts||!meta().ts)setMeta({ts,dirty:false});
+  synOk()
+ }catch(e){synOff();clearTimeout(pushT);pushT=setTimeout(push,30000)}
+ pushing=false;if(again){again=false;push()}
+}
+function adopt(d,t){
+ if(busy||!$("md").hidden){setTimeout(()=>adopt(d,t),1500);return}
+ if(meta().dirty&&meta().ts>t){push();return}
+ const keep={theme:S.theme,palOpen:S.palOpen,notified:S.notified},g=S.goals;
+ S={...d,...keep};if(!S.goals&&g)S.goals=g;normS();
+ try{localStorage.setItem("plan-v1",JSON.stringify(S))}catch(e){}
+ setMeta({ts:t,dirty:false});applyTheme();refresh();if(page==4)renderNotes();synOk()
+}
+async function pull(){
+ if(pulling)return;pulling=true;syn("⏳ synchro…");
+ try{
+  const r=await fetch(SB+"?id=eq.oscar&select=data,updated_at",{headers:SBH,cache:"no-store"});
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  const rows=await r.json(),m=meta(),lt=m.ts||0;
+  if(!rows.length){setMeta({ts:m.ts||Date.now(),dirty:true});pulling=false;return push()}
+  const rt=Date.parse(rows[0].updated_at),d=rows[0].data||{};
+  const hasLocal=S.ev.length||S.ds.length||Object.keys(S.grades).length||Object.keys(S.notes).length||Object.keys(S.done).length;
+  if(!m.ts&&hasLocal){
+   if(confirm("Des données existent déjà en ligne.\n\nOK = utiliser les données en ligne\nAnnuler = envoyer celles de cet appareil (elles remplaceront les données en ligne)"))adopt(d,rt);
+   else{setMeta({ts:Date.now(),dirty:true});pulling=false;return push()}}
+  else if(m.dirty&&lt>=rt){pulling=false;return push()}
+  else if(rt>lt){
+   if(m.dirty&&!confirm("Ce planning a aussi été modifié sur un autre appareil.\n\nOK = utiliser la version en ligne\nAnnuler = garder la version de cet appareil")){setMeta({ts:Date.now()});pulling=false;return push()}
+   adopt(d,rt)}
+  else synOk()
+ }catch(e){synOff()}
+ pulling=false;
+}
+const save=()=>{try{localStorage.setItem("plan-v1",JSON.stringify(S))}catch(e){}setMeta({ts:Date.now(),dirty:true});clearTimeout(pushT);pushT=setTimeout(push,1500)};
 const msg=t=>$("msg").textContent=t;
 const midnight=d=>{d=new Date(d);d.setHours(0,0,0,0);return d};
 const isoWeek=d=>{const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-n);return Math.ceil(((t-Date.UTC(t.getUTCFullYear(),0,1))/864e5+1)/7)};
@@ -341,6 +400,48 @@ function evFor(d,out){
  ev.sort((a,b)=>a.s-b.s);return ev;
 }
 let dragged=0,qtv="",page=1,selD=midnight(new Date()),needCenter=true,sel=dowOf(new Date()),pick=null,dur=1.5,csv="",ptype="devoir";const SP={"@ten":"Entraînement de tennis","@match":"Match de tennis"},TL={subj:"Devoirs",devoir:"Devoirs",ctrl:"Contrôle"};
+const H0=6,H1=23,PX=88;let busy=false,hiT=null;
+const snap=h=>Math.round(h*4)/4;
+const dayLbl=k=>{const d=pdate(k);return JOURS[dowOf(d)].slice(0,3)+" "+d.getDate()+" "+MS[d.getMonth()]};
+const hilite=t=>{if(hiT===t)return;if(hiT)hiT.classList.remove("dropt");hiT=t;if(t)t.classList.add("dropt")};
+const tabAt=(x,y)=>{for(const e of document.elementsFromPoint(x,y)){const t=e.closest&&e.closest(".strip .tab");if(t)return t}return null};
+function dgLabel(t,x,y){let l=$("dgl");if(!l){l=document.createElement("div");l.id="dgl";document.body.appendChild(l)}
+ if(t==null){l.style.display="none";return}
+ const r=x>innerWidth-200;l.textContent=t;l.style.display="block";l.style.left=(r?x-16:x+16)+"px";l.style.top=(y+18)+"px";l.style.transform=r?"translateX(-100%)":"none"}
+function autoscroll(x,y){
+ const s=document.querySelector(".strip"),r=s?s.getBoundingClientRect():null;
+ if(r&&y>=r.top&&y<=r.bottom){const v=Math.max(0,50-Math.min(x-r.left,r.right-x));if(v>0)s.scrollLeft+=(x<r.left+50?-1:1)*Math.min(20,v/3+2);return}
+ const zt=(r?Math.max(r.bottom,0):0)+56;
+ if(y<zt)scrollBy(0,-Math.min(24,(zt-y)/3+2));else if(y>innerHeight-70)scrollBy(0,Math.min(24,(y-(innerHeight-70))/2+3));
+}
+// moteur de glisser-déposer (souris / stylet / doigt) : o.start, o.move(x,y,st), o.end(x,y,st,annulé)
+function dragStart(ev,o){
+ const x0=ev.clientX,y0=ev.clientY,pid=ev.pointerId,th=ev.pointerType=="mouse"?4:7,st={x0,y0,sy0:scrollY};
+ let on=false,lx=x0,ly=y0,raf=0;
+ const tick=()=>{if(!on)return;autoscroll(lx,ly);o.move(lx,ly,st);raf=requestAnimationFrame(tick)};
+ const mv=m=>{if(m.pointerId!=pid)return;lx=m.clientX;ly=m.clientY;
+  if(!on){if(Math.hypot(lx-x0,ly-y0)<th)return;on=true;busy=true;document.body.classList.add("dragging");
+   const s=document.querySelector(".strip"),nv=document.querySelector(".pages");if(s){s.classList.add("stk");s.style.top=((nv?nv.getBoundingClientRect().bottom:0)+6)+"px"}
+   o.start&&o.start(st);o.move(lx,ly,st);raf=requestAnimationFrame(tick)}};
+ const clean=()=>{document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);document.removeEventListener("pointercancel",up);document.removeEventListener("keydown",kd);cancelAnimationFrame(raf);
+  if(on){busy=false;document.body.classList.remove("dragging");const s=document.querySelector(".strip");if(s){s.classList.remove("stk");s.style.top=""}hilite(null);dgLabel(null)}};
+ const up=m=>{if(m.pointerId!=pid)return;clean();if(on){dragged=Date.now();o.end(lx,ly,st,m.type=="pointercancel")}};
+ const kd=e=>{if(e.key=="Escape")up({pointerId:pid,type:"pointercancel"})};
+ document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);document.addEventListener("pointercancel",up);document.addEventListener("keydown",kd);
+}
+// ajoute un bloc depuis le panneau (st = heure de début, ou null = premier créneau libre du jour)
+function addAt(m,date,st){
+ const tn=m=="@ten"||m=="@match",kk=m=="@ten"?"ten":m=="@match"?"match":ptype,ttl=tn?SP[m]:m,d=pdate(date);let s0=st,du=dur;
+ if(s0==null){
+  const nw=new Date(),nowH=date==F(nw)?nw.getHours()+nw.getMinutes()/60+.25:0,ev=evFor(d,plan().out).filter(e=>!e.all);
+  const ph=kk=="devoir"?ev.filter(e=>e.nm=="À définir"&&e.e-Math.max(e.s,nowH)>=.5).sort((a,b)=>a.s-b.s)[0]:null;
+  if(ph){s0=Math.ceil(Math.max(ph.s,nowH)*4)/4;du=Math.min(du,ph.e-s0)}
+  else{const busyL=ev.filter(e=>e.nm!="À définir").map(e=>[e.s,e.e]).sort((a,b)=>a[0]-b[0]);let c=Math.max(8,Math.ceil(nowH*4)/4);
+   for(const [a,b] of busyL){if(c+du<=a)break;if(b>c)c=Math.ceil(b*4)/4}
+   s0=c+du<=22.75?c:null}
+  if(s0==null)return null}
+ const en=Math.min(s0+du,H1),id=Date.now()+Math.random();
+ S.ev.push({id,title:ttl,k:kk,date,s:fmt(s0),e:fmt(en),m:kk=="subj"?1:0,desc:""});save();return{id,kk,ttl,s:s0,e:en,tn}}
 const subjCol=t=>{let h=0;for(const c of String(t).toLowerCase())h=(h*31+c.charCodeAt(0))%360;return`hsl(${h} 62% 42%)`};
 function render(){
  const now=midnight(new Date()),mon=new Date(selD);mon.setDate(selD.getDate()-dowOf(selD));sel=dowOf(selD);
@@ -353,7 +454,7 @@ function render(){
   if(c0){const en=pd(c0.b),rp=new Date(en);rp.setDate(rp.getDate()+1);t=`🏖️ <b>${esc(c0.name)}</b> · jusqu'au ${fm(en)} · reprise <b>${fm(rp)}</b> (dans ${Math.round((rp-now)/864e5)} j)`}
   else if(nx)t=`🏖️ Prochaines vacances : <b>${esc(nx.name)}</b> · dès le ${fm(pd(nx.a))} (dans ${Math.round((pd(nx.a)-now)/864e5)} j)`;
   $("vbar").innerHTML=t?`<div class="vbar">${t}</div>`:""}
- const H0=6,H1=23,PX=88,cur=days[sel],nw=new Date(),nh=nw.getHours()+nw.getMinutes()/60,tk=F(now),isPast=e=>cur.k<tk||(cur.k==tk&&e.e<=nh);
+ const cur=days[sel],nw=new Date(),nh=nw.getHours()+nw.getMinutes()/60,tk=F(now),isPast=e=>cur.k<tk||(cur.k==tk&&e.e<=nh);
  let h=`<div class="strip">`;
  {const sd0=new Date(now);sd0.setDate(now.getDate()-30);
   for(let i=0;i<220;i++){const d=new Date(sd0);d.setDate(sd0.getDate()+i);const k=F(d),vc=isVac(d),ctl=S.ev.some(x=>x.date==k&&x.k=="ctrl")||S.ds.some(x=>x.date==k),first=d.getDate()==1||i==0;
@@ -373,29 +474,59 @@ function render(){
   return `<div class="bl ${e.c}${S.done[e.key]?" done":""}${cp?" cp":""}${isPast(e)?" past":""}" data-b="${ix}"${e.cid?` data-cid="${e.cid}"`:""} style="${e.col?"--sc:"+e.col+";":""}${(e.cid&&placed.some(q=>e.s<q.e&&e.e>q.s))?"left:52%;z-index:2;":""}top:${(e.s-H0)*PX+2}px;height:${Math.max(hp-6,20)}px">${CK[e.c]?`<input type="checkbox" data-k="${e.key}" ${S.done[e.key]?"checked":""}>`:""}<div class="bt">${cp?`<span class="nm">${nm}</span><span class="tm">${tm}</span>`:`${e.tag?`<span class="tg">${esc(e.tag)}</span>`:""}<span class="nm">${nm}</span><span class="tm">${tm}</span>${e.desc?`<span class="dc">${esc(e.desc)}</span>`:""}`}</div>${e.cid?`<span class="x" data-x="${e.cid}" title="Supprimer">✕</span><span class="rz"></span>`:""}</div>`}).join("");
  h+=`</div>`;
  const subs=[...new Set([...S.subjects,...S.ds.map(x=>x.subj)])];
- h+=`</div><aside class="pal"><h3>Je place…</h3><div class="seg">${[["devoir","📝 Devoirs"],["ctrl","🧪 Contrôle"]].map(x=>`<button data-t="${x[0]}" class="${ptype==x[0]?"on":""}">${x[1]}</button>`).join("")}</div><h3 class="h3b">Matière</h3><div class="chips">`+subs.map(m=>`<button class="chip${pick==m?" on":""}" data-m="${esc(m)}" style="--c:${subjCol(m)}">${esc(m)}</button>`).join("")+`</div><h3 class="h3b">🎾 Tennis</h3><div class="chips"><button class="chip${pick=="@ten"?" on":""}" data-m="@ten" style="--c:#20c997">🎾 Entraînement</button><button class="chip${pick=="@match"?" on":""}" data-m="@match" style="--c:#f08c00">🏆 Match</button></div><label class="dl">Durée <select id="dur">${[.5,1,1.5,2,3].map(x=>`<option value="${x}"${x==dur?" selected":""}>${hh(x)}</option>`).join("")}</select></label><div class="hint">${pick?"👆 Clique sur la frise à l'heure voulue pour placer <b>"+esc(SP[pick]||(TL[ptype]+" · "+pick))+"</b>, ou écris dans la case ci-dessous":"Choisis un type (devoirs ou contrôle) et une matière, puis clique sur la frise, ou écris dans la case ci-dessous : le bloc se place tout seul."}</div><div class="qa"><input id="qt" placeholder="Écris-le ici (ex : exercices 12 à 15, à 17h)" value="${esc(qtv)}"><button id="qb">Ajouter</button></div><div class="addm"><input id="nm" placeholder="Autre matière"><button id="am">+</button></div></aside>${pOpen&&innerWidth<=900?`<div class="pbk"></div>`:""}</div>`;
+ h+=`</div><aside class="pal"><h3>Je place…</h3><div class="seg">${[["devoir","📝 Devoirs"],["ctrl","🧪 Contrôle"]].map(x=>`<button data-t="${x[0]}" class="${ptype==x[0]?"on":""}">${x[1]}</button>`).join("")}</div><h3 class="h3b">Matière</h3><div class="chips">`+subs.map(m=>`<button class="chip${pick==m?" on":""}" data-m="${esc(m)}" style="--c:${subjCol(m)}">${esc(m)}</button>`).join("")+`</div><h3 class="h3b">🎾 Tennis</h3><div class="chips"><button class="chip${pick=="@ten"?" on":""}" data-m="@ten" style="--c:#20c997">🎾 Entraînement</button><button class="chip${pick=="@match"?" on":""}" data-m="@match" style="--c:#f08c00">🏆 Match</button></div><label class="dl">Durée <select id="dur">${[.5,1,1.5,2,3].map(x=>`<option value="${x}"${x==dur?" selected":""}>${hh(x)}</option>`).join("")}</select></label><div class="hint">${pick?"👆 Clique sur la frise à l'heure voulue pour placer <b>"+esc(SP[pick]||(TL[ptype]+" · "+pick))+"</b>, ou écris dans la case ci-dessous":"Choisis un type (devoirs ou contrôle) et une matière, puis clique sur la frise, ou écris dans la case ci-dessous : le bloc se place tout seul."}</div><div class="hint">💡 Glisse une matière avec la souris : sur la frise pour la poser à l'heure voulue, ou sur un jour en haut pour la placer ce jour-là. Glisse un bloc posé pour le déplacer (ou sur un jour pour changer sa date) ; Échap annule.</div><div class="qa"><input id="qt" placeholder="Écris-le ici (ex : exercices 12 à 15, à 17h)" value="${esc(qtv)}"><button id="qb">Ajouter</button></div><div class="addm"><input id="nm" placeholder="Autre matière"><button id="am">+</button></div></aside>${pOpen&&innerWidth<=900?`<div class="pbk"></div>`:""}</div>`;
  const oldSt=g.querySelector(".strip"),stSL=oldSt?oldSt.scrollLeft:null;
  g.className="";g.innerHTML=h;
  g.querySelectorAll('input[data-k]').forEach(c=>c.onchange=()=>{if(c.checked)S.done[c.dataset.k]=1;else delete S.done[c.dataset.k];save();render()});
- g.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{pick=pick==b.dataset.m?null:b.dataset.m;if(pick&&innerWidth<=900)S.palOpen=false;render()});
+ g.querySelectorAll(".chip").forEach(b=>{
+  b.onclick=()=>{if(Date.now()-dragged<400)return;pick=pick==b.dataset.m?null:b.dataset.m;if(pick&&innerWidth<=900)S.palOpen=false;render()};
+  b.addEventListener("pointerdown",ev=>{
+   if(ev.button!==0||ev.pointerType=="touch")return;
+   const m=b.dataset.m,tn=m=="@ten"||m=="@match",col=b.style.getPropertyValue("--c")||"#9b8cff",lbl=(tn?"":TL[ptype]+" · ")+b.textContent.trim(),tl=g.querySelector(".tl");
+   let gh=null,drop=null,tab=null;
+   dragStart(ev,{
+    start(){gh=document.createElement("div");gh.className="ghost";gh.style.setProperty("--c",col);tl.appendChild(gh);
+     if(innerWidth<=900){const c=g.querySelector(".cols"),pb=g.querySelector(".pbk");if(c)c.classList.remove("pop");if(pb)pb.remove();S.palOpen=false}},
+    move(mx,my){
+     tab=tabAt(mx,my);hilite(tab);drop=null;gh.style.display="none";
+     if(!tab){const r=tl.getBoundingClientRect();
+      if(mx>=r.left-30&&mx<=r.right&&my>=r.top&&my<=r.bottom){let s0=snap(H0+(my-r.top)/PX);s0=Math.max(H0,Math.min(s0,H1-.5));const e0=Math.min(s0+dur,H1);
+       drop={s:s0,e:e0};gh.style.display="flex";gh.style.top=((s0-H0)*PX+2)+"px";gh.style.height=Math.max((e0-s0)*PX-6,20)+"px";gh.textContent=fmt(s0)+"–"+fmt(e0)}}
+     dgLabel(tab?"→ "+dayLbl(tab.dataset.d):drop?lbl+" · "+fmt(drop.s)+"–"+fmt(drop.e):lbl,mx,my)},
+    end(mx,my,st,cancel){
+     gh.remove();
+     if(cancel||(!drop&&!tab)){if(innerWidth<=900)save();if(innerWidth<=900)render();return}
+     const date=tab?tab.dataset.d:cur.k,r=addAt(m,date,tab?null:drop.s);
+     if(innerWidth<=900)save();
+     if(!r){render();return msg("Pas de créneau libre ce jour-là : dépose le bloc directement sur la frise.")}
+     if(tab)selD=pdate(date);
+     render();msg("✅ "+(r.kk=="devoir"||r.kk=="ctrl"?TL[r.kk]+" · ":"")+r.ttl+" placé le "+dayLbl(date)+" de "+fmt(r.s)+" à "+fmt(r.e)+" · clique dessus pour décrire ou supprimer.");
+     if(!tab&&(r.kk=="devoir"||r.kk=="ctrl")){const E=evFor(pdate(date),plan().out).find(q=>q.cid==r.id);if(E)openMd(E)}}
+   })})});
  g.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{ptype=b.dataset.t;render()});
  $("dur").onchange=()=>{dur=+$("dur").value};$("qb").onclick=quickAdd;$("qt").oninput=()=>{qtv=$("qt").value};$("qt").onkeydown=e=>{if(e.key=="Enter")quickAdd()};
  $("am").onclick=()=>{const v=$("nm").value.trim().slice(0,30);if(v&&!S.subjects.includes(v)){S.subjects.push(v);save()}if(v)pick=v;render()};
  g.querySelectorAll("[data-x]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();S.ev=S.ev.filter(q=>String(q.id)!=x.dataset.x);save();render()});
  g.querySelectorAll(".bl").forEach(b=>b.onclick=ev=>{if(Date.now()-dragged<400||ev.target.closest("input")||ev.target.closest(".x"))return;openMd(bl[+b.dataset.b])});
  g.querySelectorAll(".bl[data-cid]").forEach(b=>b.addEventListener("pointerdown",ev=>{
-  if(ev.target.closest("input")||ev.target.closest(".x"))return;
+  if(ev.button!==0||ev.target.closest("input")||ev.target.closest(".x"))return;
   const x=S.ev.find(q=>String(q.id)==b.dataset.cid);if(!x)return;
-  const rs=ev.target.classList.contains("rz"),y0=ev.clientY,s0=T(x.s),e0=T(x.e);let moved=false,ns=s0,ne=e0;
-  try{b.setPointerCapture(ev.pointerId)}catch(_){}
-  const mv=m=>{const dy=m.clientY-y0;if(!moved&&Math.abs(dy)<7)return;moved=true;const dh=Math.round(dy/PX*4)/4;
-   if(rs){ns=s0;ne=Math.max(s0+.25,Math.min(H1,e0+dh))}else{const len=e0-s0;ns=Math.max(H0,Math.min(H1-len,s0+dh));ne=ns+len}
-   b.style.top=((ns-H0)*PX+2)+"px";b.style.height=Math.max((ne-ns)*PX-6,20)+"px";b.classList.add("drag")};
-  const up=()=>{b.removeEventListener("pointermove",mv);b.removeEventListener("pointerup",up);b.removeEventListener("pointercancel",up);
-   if(moved){x.s=fmt(ns);x.e=fmt(ne);save();dragged=Date.now();refresh()}};
-  b.addEventListener("pointermove",mv);b.addEventListener("pointerup",up);b.addEventListener("pointercancel",up)}));
+  const rs=ev.target.classList.contains("rz"),s0=T(x.s),e0=T(x.e),len=e0-s0;let ns=s0,ne=e0,tab=null;
+  dragStart(ev,{
+   start(){b.classList.add("drag")},
+   move(mx,my,st){
+    const dh=snap(((my-st.y0)+(scrollY-st.sy0))/PX);
+    if(rs){ns=s0;ne=Math.max(s0+.25,Math.min(H1,e0+dh))}else{ns=Math.max(H0,Math.min(H1-len,s0+dh));ne=ns+len}
+    b.style.top=((ns-H0)*PX+2)+"px";b.style.height=Math.max((ne-ns)*PX-6,20)+"px";
+    tab=rs?null:tabAt(mx,my);if(tab&&tab.dataset.d==x.date)tab=null;hilite(tab);b.classList.toggle("ghosted",!!tab);
+    dgLabel(tab?"→ "+dayLbl(tab.dataset.d):fmt(ns)+"–"+fmt(ne),mx,my)},
+   end(mx,my,st,cancel){
+    if(cancel){refresh();return}
+    if(tab){x.date=tab.dataset.d;msg("📅 Bloc déplacé au "+dayLbl(x.date)+" · "+fmt(T(x.s))+"–"+fmt(T(x.e)))}else{x.s=fmt(ns);x.e=fmt(ne)}
+    save();refresh()}
+  })}));
  {const tl=g.querySelector(".tl");tl.onclick=ev=>{
-  if(ev.target.closest(".bl"))return;
+  if(ev.target.closest(".bl")||Date.now()-dragged<400)return;
   if(!pick)return msg("Choisis d'abord un type et une matière avec le bouton 🧩.");
   const r=tl.getBoundingClientRect();let st=Math.round((H0+(ev.clientY-r.top)/PX)*4)/4;st=Math.max(H0,Math.min(st,H1-.5));const en=Math.min(st+dur,H1);
   const tn=pick=="@ten"||pick=="@match",kk=pick=="@ten"?"ten":pick=="@match"?"match":ptype,ttl=tn?SP[pick]:pick,id=Date.now()+Math.random();
@@ -459,7 +590,7 @@ function checkReminders(){
    if(S.rem.d1&&e.cid&&(e.c=="dev"||e.c=="ds"||e.tag=="MATCH")&&mins<=1440)fire(e.key+"|j1",(o?"Demain à ":"Aujourd'hui à ")+fmt(e.s)+" : "+e.t);
   }}
 }
-setInterval(()=>{const a=document.activeElement;if(!(a&&a.id=="qt"))render()},60000);setInterval(checkReminders,30000);checkReminders();
+setInterval(()=>{const a=document.activeElement;if(!(a&&a.id=="qt")&&!busy)render()},60000);setInterval(checkReminders,30000);checkReminders();
 const syncRem=()=>{S.rem=S.rem||{};$("d1").textContent="📆 Rappel la veille : "+(S.rem.d1?"activé":"désactivé");$("d1").classList.toggle("on",!!S.rem.d1);const g="Notification" in window&&Notification.permission=="granted";$("bell").textContent=g?"🔔 Rappels 1 h avant : activés":"🔔 Activer les rappels (1 h avant)";$("bell").classList.toggle("on",g)};
 const askN=async()=>{try{const r=await Notification.requestPermission();msg(r=="granted"?"🔔 Notifications activées. Garde l'appli ouverte : un message arrive 1 h avant chaque séance non cochée.":"Notifications refusées : un bandeau s'affichera dans la page à la place.")}catch(e){msg("Notifications indisponibles ici : un bandeau s'affichera dans la page (appli ouverte).")}syncRem()};
 $("bell").onclick=askN;
@@ -637,5 +768,8 @@ $("ptg").onclick=togPal;$("fab").onclick=togPal;
 
 $("flip").onclick=()=>{S.flip=!S.flip;save();render()};
 render();
+$("syn").onclick=()=>{if(meta().dirty)push();else pull()};
+addEventListener("online",()=>pull());document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
+pull();
 </script>
 <script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{})</script></body></html>
