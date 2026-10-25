@@ -470,7 +470,7 @@ function holdDrag(b,ev,go){
  const end=()=>{clearTimeout(t);setTimeout(()=>{b._act=false;b.classList.remove("hold")},80);document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",end);document.removeEventListener("pointercancel",end)};
  const mv=m=>{if(m.pointerId==pid&&!b._act&&Math.hypot(m.clientX-x0,m.clientY-y0)>12)clearTimeout(t)};
  document.addEventListener("pointermove",mv);document.addEventListener("pointerup",end);document.addEventListener("pointercancel",end)}
-var VAPID="";   // <- colle ici ta clé publique VAPID (voir push-setup.md)
+var VAPID="BBWO7C5mOZdJ0u04fVvgS1Z188nSadamv9_Y3Wt-hw2AK_yaXZHw71elggQGqiZYv8I2Ucw7thlctHtNoIYzpcM";   // clé publique VAPID (la clé privée reste dans les secrets Supabase)
 var wpT=null;
 const REST=SB.replace("planning_state","");
 const wpq=(path,method,body,extra)=>fetch(REST+path,{method,headers:{...SBH,Authorization:"Bearer "+SBK,...(extra||{})},body:body==null?undefined:JSON.stringify(body)});
