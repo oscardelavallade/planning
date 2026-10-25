@@ -163,9 +163,9 @@ h1::after{content:"▍";margin-left:4px;-webkit-text-fill-color:var(--acc);anima
 .nxr b{font-size:15.5px;font-family:"Sora",sans-serif;font-weight:600}.nxr i{font-style:normal;font-size:13px;opacity:.88}
 .nxr.ok{opacity:.5}.nxr.ok b{text-decoration:line-through}
 .nxr .dx{margin-left:auto;background:none;border:0;color:var(--mu);cursor:pointer;font-size:16px}
-.bl[data-cid]{touch-action:none;cursor:grab}
+.bl[data-cid]{cursor:grab}
 .bl.drag{z-index:6!important;opacity:.95;box-shadow:0 14px 34px rgba(0,0,0,.55);cursor:grabbing}
-.rz{position:absolute;left:0;right:0;bottom:0;height:14px;cursor:ns-resize;touch-action:none}
+.rz{position:absolute;left:0;right:0;bottom:0;height:14px;cursor:ns-resize}
 .rz::after{content:"";position:absolute;left:50%;bottom:3px;width:28px;height:3px;margin-left:-14px;border-radius:3px;background:rgba(255,255,255,.55)}
 .bl.cp{line-height:1.1}.bl.cp .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .bl.cp .bt{min-width:0}
@@ -237,6 +237,8 @@ body.dragging,body.dragging *{cursor:grabbing!important;user-select:none!importa
 .mbtn.big button{flex:1;padding:14px;font-size:15px}.mbtn .ko{border-color:#ff922b;color:#ff922b}.mbtn .okb{background:linear-gradient(135deg,#20c997,#12a67c)!important}
 .bl.hold,.chip.hold{transform:scale(1.03);box-shadow:0 12px 30px rgba(0,0,0,.5)}
 .chip,.bl{-webkit-touch-callout:none}
+.chip{touch-action:none}
+@media(pointer:coarse){.bl .x{display:none}}
 </style></head><body>
 <div id="toast"></div>
 <div id="md" hidden></div>
@@ -246,7 +248,7 @@ body.dragging,body.dragging *{cursor:grabbing!important;user-select:none!importa
 <nav class="pages"><button id="nv1" class="on">📅 Planning</button><button id="nv2">🗓 À venir</button><button id="nv3">🏃 Prépa</button><button id="nv4">📊 Notes</button></nav>
 <div id="pgPlan"><div id="vbar"></div>
 <div id="msg"></div>
-<div class="tools"><button id="bell">🔔 Activer les rappels (1 h avant)</button><button id="d1">📆 Rappel la veille : désactivé</button><button id="ptg">🧩 Panneau</button><button id="flip" title="Inverser semaine A/B">A⇄B</button><button id="hidb" hidden></button></div>
+<div class="tools"><button id="bell">🔔 Activer les rappels (1 h avant)</button><button id="d1">📆 Rappel la veille : désactivé</button><button id="wpb">📲 Notifications téléphone</button><button id="ptg">🧩 Panneau</button><button id="flip" title="Inverser semaine A/B">A⇄B</button><button id="hidb" hidden></button></div>
 <div id="grid" style="margin-top:12px"></div>
 
 </div>
@@ -316,7 +318,7 @@ async function pull(){
  }catch(e){synOff()}
  pulling=false;
 }
-const save=()=>{try{localStorage.setItem("plan-v1",JSON.stringify(S))}catch(e){}setMeta({ts:Date.now(),dirty:true});clearTimeout(pushT);pushT=setTimeout(push,1500)};
+const save=()=>{try{localStorage.setItem("plan-v1",JSON.stringify(S))}catch(e){}setMeta({ts:Date.now(),dirty:true});clearTimeout(pushT);pushT=setTimeout(push,1500);wpSched()};
 const msg=t=>$("msg").textContent=t;
 const midnight=d=>{d=new Date(d);d.setHours(0,0,0,0);return d};
 const isoWeek=d=>{const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-n);return Math.ceil(((t-Date.UTC(t.getUTCFullYear(),0,1))/864e5+1)/7)};
@@ -464,10 +466,46 @@ function nextOcc(x,from){for(let i=0;i<400;i++){const d=pdate(from);d.setDate(d.
 const RECL={d:"chaque jour",w:"chaque semaine",m:"chaque mois"};
 function holdDrag(b,ev,go){
  const x0=ev.clientX,y0=ev.clientY,pid=ev.pointerId;b._act=false;
- const t=setTimeout(()=>{b._act=true;try{navigator.vibrate&&navigator.vibrate(12)}catch(_){}b.classList.add("hold");go()},280);
+ const t=setTimeout(()=>{b._act=true;try{navigator.vibrate&&navigator.vibrate(12)}catch(_){}b.classList.add("hold");go()},380);
  const end=()=>{clearTimeout(t);setTimeout(()=>{b._act=false;b.classList.remove("hold")},80);document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",end);document.removeEventListener("pointercancel",end)};
- const mv=m=>{if(m.pointerId==pid&&!b._act&&Math.hypot(m.clientX-x0,m.clientY-y0)>9)clearTimeout(t)};
+ const mv=m=>{if(m.pointerId==pid&&!b._act&&Math.hypot(m.clientX-x0,m.clientY-y0)>12)clearTimeout(t)};
  document.addEventListener("pointermove",mv);document.addEventListener("pointerup",end);document.addEventListener("pointercancel",end)}
+var VAPID="";   // <- colle ici ta clé publique VAPID (voir push-setup.md)
+var wpT=null;
+const REST=SB.replace("planning_state","");
+const wpq=(path,method,body,extra)=>fetch(REST+path,{method,headers:{...SBH,Authorization:"Bearer "+SBK,...(extra||{})},body:body==null?undefined:JSON.stringify(body)});
+const b64u=v=>{const p="=".repeat((4-v.length%4)%4),r=atob((v+p).replace(/-/g,"+").replace(/_/g,"/"));return Uint8Array.from(r,c=>c.charCodeAt(0))};
+const wpOn=()=>localStorage.getItem("wpon")=="1";
+function wpState(){const b=$("wpb");if(!b)return;b.textContent=wpOn()?"📲 Notifications téléphone : activées":"📲 Notifications téléphone";b.classList.toggle("on",wpOn())}
+async function wpEnable(){
+ if(!VAPID)return msg("Il manque la clé VAPID dans index.html : suis le guide push-setup.md (étape 3).");
+ if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window))return msg("Ce navigateur ne gère pas les notifications push. Sur iPhone : ajoute d'abord l'appli à l'écran d'accueil, puis ouvre-la depuis l'icône.");
+ try{
+  const perm=await Notification.requestPermission();if(perm!="granted")return msg("Notifications refusées : autorise-les dans les réglages du téléphone, puis recommence.");
+  const reg=await navigator.serviceWorker.ready;
+  let sub=await reg.pushManager.getSubscription();
+  if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID)});
+  const j=sub.toJSON();
+  const r=await wpq("push_subs?on_conflict=endpoint","POST",{endpoint:j.endpoint,sub:j},{Prefer:"resolution=merge-duplicates,return=minimal"});
+  if(!r.ok)throw new Error("tables Supabase absentes ou bloquées ("+r.status+") : exécute setup.sql");
+  localStorage.setItem("wpep",j.endpoint);localStorage.setItem("wpon","1");wpState();
+  await wpSync();msg("📲 Notifications activées : tu les recevras sur l'écran d'accueil, même appli fermée.");
+ }catch(e){msg("Activation impossible : "+(e.message||e))}
+}
+function wpSched(){if(!VAPID||!wpOn())return;clearTimeout(wpT);wpT=setTimeout(wpSync,4000)}
+async function wpSync(){
+ const ep=localStorage.getItem("wpep");if(!ep||!VAPID||!wpOn())return;
+ const {out}=plan(),now=new Date(),rows=[],tag=ep.slice(-20);
+ for(let i=0;i<14;i++){const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+i);
+  for(const e of evFor(d,out)){
+   if(e.all||S.done[e.key])continue;
+   const t=new Date(d.getFullYear(),d.getMonth(),d.getDate(),Math.floor(e.s+1e-6),Math.round((e.s%1)*60)),lbl=((e.tag&&e.cid)?e.tag+" · ":"")+(e.nm||e.t)+(e.desc?" — "+e.desc:"");
+   if(CK[e.c]){const f=new Date(t-36e5);if(f>now)rows.push({id:tag+"|"+e.key+"|h",endpoint:ep,fire_at:f.toISOString(),title:"⏰ Dans 1 h · "+fmt(e.s),body:lbl})}
+   if(S.rem&&S.rem.d1&&e.cid&&(e.c=="dev"||e.c=="ds"||e.tag=="MATCH")){const f=new Date(t-864e5);if(f>now)rows.push({id:tag+"|"+e.key+"|j",endpoint:ep,fire_at:f.toISOString(),title:"📆 Demain · "+fmt(e.s),body:lbl})}
+  }}
+ try{await wpq("push_rem?endpoint=eq."+encodeURIComponent(ep)+"&sent=eq.false","DELETE");
+  for(let i=0;i<rows.length;i+=200)await wpq("push_rem?on_conflict=id","POST",rows.slice(i,i+200),{Prefer:"resolution=merge-duplicates,return=minimal"})}catch(_){}
+}
 function courseAt(date,st,subj){
  const ev=evFor(pdate(date),plan().out).filter(e=>e.c=="work"&&e.tag=="COURS");
  return (st!=null?ev.find(e=>st>=e.s-1e-6&&st<e.e-1e-6):ev.find(e=>subj&&e.nm&&e.nm.toLowerCase()==String(subj).toLowerCase()))||null}
@@ -546,7 +584,7 @@ function render(){
      render();msg("✅ "+(r.kk=="devoir"||r.kk=="ctrl"?TL[r.kk]+" · ":"")+r.ttl+" placé le "+dayLbl(date)+" de "+fmt(r.s)+" à "+fmt(r.e)+" · clique dessus pour décrire ou supprimer.");
      if(!tab&&(r.kk=="devoir"||r.kk=="ctrl")){const E=evFor(pdate(date),plan().out).find(q=>q.cid==r.id);if(E)openMd(E)}}
    });
-   if(ev.pointerType=="touch")holdDrag(b,ev,go);else go()})});
+   go()})});
  g.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{ptype=b.dataset.t;render()});
  $("dur").onchange=()=>{dur=+$("dur").value};$("rcs").onchange=()=>{recv=$("rcs").value};$("qb").onclick=quickAdd;$("qt").oninput=()=>{qtv=$("qt").value};$("qt").onkeydown=e=>{if(e.key=="Enter")quickAdd()};
  $("am").onclick=()=>{const v=$("nm").value.trim().slice(0,30);if(v&&!S.subjects.includes(v)){S.subjects.push(v);save()}if(v)pick=v;render()};
@@ -570,7 +608,7 @@ function render(){
     if(!x){S.ov[be.key]={s:ns,e:ne}}else if(tab){x.date=tab.dataset.d;msg("📅 Bloc déplacé au "+dayLbl(x.date)+" · "+fmt(T(x.s))+"–"+fmt(T(x.e)))}else{x.s=fmt(ns);x.e=fmt(ne)}
     save();refresh()}
   });
-  if(ev.pointerType=="touch"&&!be.cid)holdDrag(b,ev,go);else go()}));
+  if(ev.pointerType=="touch")holdDrag(b,ev,go);else go()}));
  {const tl=g.querySelector(".tl");tl.onclick=ev=>{
   if(ev.target.closest(".bl")||Date.now()-dragged<400)return;
   if(!pick)return msg("Choisis d'abord un type et une matière avec le bouton 🧩.");
@@ -627,7 +665,7 @@ function toast(t){const el=$("toast");el.textContent=t;el.style.display="block"}
 $("toast").onclick=()=>$("toast").style.display="none";
 function checkReminders(){
  const n=new Date(),{out}=plan();S.rem=S.rem||{};
- const fire=(id,txt)=>{if(S.notified.includes(id))return;S.notified.push(id);S.notified=S.notified.slice(-120);save();toast("⏰ "+txt);try{if("Notification" in window&&Notification.permission=="granted")new Notification("⏰ Rappel planning",{body:txt})}catch(x){}};
+ const fire=(id,txt)=>{if(S.notified.includes(id))return;S.notified.push(id);S.notified=S.notified.slice(-120);save();toast("⏰ "+txt);try{if(!wpOn()&&"Notification" in window&&Notification.permission=="granted")new Notification("⏰ Rappel planning",{body:txt})}catch(x){}};
  for(let o=0;o<2;o++){const d=new Date(n);d.setDate(n.getDate()+o);
   for(const e of evFor(d,out)){
    if(e.all||S.done[e.key])continue;
@@ -842,7 +880,7 @@ function quickAdd(){
  msg("✅ "+(kk=="devoir"||kk=="ctrl"?TL[kk]+" · ":"")+ttl+" placé le "+JOURS[dowOf(d)]+" "+d.getDate()+" de "+fmt(s0)+" à "+fmt(en)+where+".");
 }
 const togPal=()=>{S.palOpen=!(S.palOpen==null?innerWidth>900:S.palOpen);save();render()};
-$("ptg").onclick=togPal;$("fab").onclick=togPal;
+$("ptg").onclick=togPal;$("wpb").onclick=wpEnable;wpState();if(wpOn())setTimeout(wpSync,6000);$("fab").onclick=togPal;
 
 $("flip").onclick=()=>{S.flip=!S.flip;save();render()};
 render();
