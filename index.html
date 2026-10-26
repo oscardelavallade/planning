@@ -223,7 +223,11 @@ body.dragging,body.dragging *{cursor:grabbing!important;user-select:none!importa
 
 /* ===== AJOUTS : Duolingo, contrôle superposé, résultats prépa ===== */
 .duo{--c:#4caf10}
-.bl.ovr{outline:2px dashed rgba(255,255,255,.75);outline-offset:-6px;box-shadow:0 10px 28px color-mix(in srgb,var(--c) 55%,transparent)}
+.bl.ds{--c:#e11d48;background:linear-gradient(135deg,#ff2e63,#c2103f)!important;border-left-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.9),0 12px 32px rgba(225,29,72,.65)!important}
+.bl.ds .tg{font-size:12px;letter-spacing:.2em;background:#fff;color:#c2103f;border-color:#fff;font-weight:800}
+.bl.ds .nm{font-size:21px;font-weight:800}
+.bl.ds.cp .nm{font-size:15px}.bl.ds.cp .tg{display:none}
+.bl.md .dc{display:none}.bl.md .tg{margin-bottom:0}.bl.md .nm{font-size:17px}.bl.ds.md .nm{font-size:19px}
 @media(pointer:fine){.bl{cursor:grab}}
 .ss{border-left-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
 .ss.r-ok{border-left-color:#20c997;background:color-mix(in srgb,#20c997 16%,transparent)}
@@ -391,7 +395,7 @@ function plan(){
 }
 
 const CK={run:1,ten:1,trn:1,rev:1,pre:1,perso:1,ds:1,dev:1,duo:1};
-const KM={subj:["📝","Devoirs","dev"],devoir:["📝","Devoirs","dev"],ctrl:["🧪","Contrôle","ds"],match:["🏆","Match","ten"],ten:["🎾","Tennis","ten"],perso:["⭐","","perso"]};
+const KM={subj:["📝","Devoirs","dev"],devoir:["📝","Devoirs","dev"],ctrl:["🧪","Contrôle","ds"],match:["🏆","Match","ten"],ten:["🎾","Tennis","ten"],perso:["⭐","","perso"],duo:["🦉","","duo"]};
 const evLbl=x=>{const M=KM[x.k||(x.m?"subj":"perso")]||KM.perso;return M[0]+" "+(M[1]?M[1]+" · ":"")+x.title.replace(/^Contrôle /,"")};
 const isVac=d=>{const k=F(d);return S.vacs.some(v=>k>=v.a&&k<=v.b)};
 const slotsFor=d=>{const w=dowOf(d);return isVac(d)?[]:SLOTS[w]};
@@ -415,7 +419,6 @@ function evFor(d,out){
   gaps.forEach(([a1,b1])=>ev.push({s:a1,e:b1,t:`📝 Devoirs (${hh(b1-a1)}) · à définir`,c:"dev",nm:"À définir",tag:"DEVOIRS ("+hh(b1-a1)+")"}))}
  S.ev.filter(x=>occurs(x,k)).forEach(x=>{const kk=x.k||(x.m?"subj":"perso"),M=KM[kk]||KM.perso,ti=x.title.replace(/^Contrôle /,"");ev.push({s:T(x.s),e:T(x.e),t:evLbl(x),c:M[2],cid:x.id,rec:x.rec,nm:ti,tag:M[1].toUpperCase(),desc:x.desc||"",col:["subj","devoir","ctrl"].includes(kk)?subjCol(ti):null})});
  const pi=prepInfo(d,ev.last);if(pi)ev.push({s:pi.s,e:pi.s+.25,t:"Prépa 15 min : "+pi.short,c:"pre",nm:"Prépa · "+pi.n+" + 20 pompes · gainage 2'"});
- ev.push({s:18.5,e:18.75,t:"Duolingo",c:"duo",nm:"Duolingo"});
  ev.forEach(e=>{e.key=k+"|"+(+e.s).toFixed(2)+"|"+e.c;if(!e.desc&&S.notes[e.key])e.desc=S.notes[e.key]});
  const vis=ev.filter(e=>e.cid||e.all||!(S.hid[e.key]||S.hidR[rkey(e,i)]));
  vis.forEach(e=>{const o=S.ov[e.key];if(o&&!e.cid&&!e.all){e.os=e.s;e.s=o.s;e.e=o.e}});
@@ -470,7 +473,7 @@ function holdDrag(b,ev,go){
  const end=()=>{clearTimeout(t);setTimeout(()=>{b._act=false;b.classList.remove("hold")},80);document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",end);document.removeEventListener("pointercancel",end)};
  const mv=m=>{if(m.pointerId==pid&&!b._act&&Math.hypot(m.clientX-x0,m.clientY-y0)>12)clearTimeout(t)};
  document.addEventListener("pointermove",mv);document.addEventListener("pointerup",end);document.addEventListener("pointercancel",end)}
-var VAPID="BBWO7C5mOZdJ0u04fVvgS1Z188nSadamv9_Y3Wt-hw2AK_yaXZHw71elggQGqiZYv8I2Ucw7thlctHtNoIYzpcM";   // clé publique VAPID (la clé privée reste dans les secrets Supabase)
+var VAPID="";   // <- colle ici ta clé publique VAPID (voir push-setup.md)
 var wpT=null;
 const REST=SB.replace("planning_state","");
 const wpq=(path,method,body,extra)=>fetch(REST+path,{method,headers:{...SBH,Authorization:"Bearer "+SBK,...(extra||{})},body:body==null?undefined:JSON.stringify(body)});
@@ -524,6 +527,7 @@ function addAt(m,date,st){
  S.ev.push({id,title:ttl,k:kk,date,s:fmt(s0),e:fmt(en),m:kk=="subj"?1:0,desc:"",rec:recv});save();return{id,kk,ttl,s:s0,e:en,tn}}
 const subjCol=t=>{let h=0;for(const c of String(t).toLowerCase())h=(h*31+c.charCodeAt(0))%360;return`hsl(${h} 62% 42%)`};
 function render(){
+ if(!S.duoSeeded){S.duoSeeded=1;S.ev.push({id:"duo1",title:"Duolingo",k:"duo",date:F(midnight(new Date())),s:"18:30",e:"18:45",m:0,desc:"",rec:""});save()}
  const now=midnight(new Date()),mon=new Date(selD);mon.setDate(selD.getDate()-dowOf(selD));sel=dowOf(selD);
  const A=weekA(mon);$("ab").textContent=`Semaine ${A?"A (Q1 · ven. 8h)":"B (Q2 · ven. 9h)"} · S${isoWeek(mon)}${[0,1,2,3,4,5,6].some(i=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return isVac(d)})?" · 🏖️ vacances":""}`;
  const {out,warn}=plan(),g=$("grid");syncHid();
@@ -548,11 +552,13 @@ function render(){
  {const pi=prepInfo(cur.d);if(pi)h+=`<div class="ev pb">💪 Prépa du jour (15 min, semaine ${pi.w}) : ${pi.full}</div>`}
  h+=`<div class="tl" style="height:${(H1-H0)*PX}px">`;
  for(let x=H0;x<=H1;x++)h+=`<div class="hl" style="top:${(x-H0)*PX}px"><span>${x}h</span></div>`;
- const placed=cur.ev.filter(e=>!e.all&&!e.cid);
- const bl=cur.ev.filter(e=>!e.all);
- const ovl=e=>e.c=="ds"&&e.cid&&bl.some(q=>q.c=="work"&&e.s<q.e&&e.e>q.s);
+ const ctl=cur.ev.filter(e=>!e.all&&e.c=="ds"&&e.cid);
+ const hid=e=>e.c=="work"&&ctl.some(c=>Math.min(e.e,c.e)-Math.max(e.s,c.s)>=.5*(e.e-e.s));
+ const placed=cur.ev.filter(e=>!e.all&&!e.cid&&!hid(e));
+ const bl=cur.ev.filter(e=>!e.all&&!hid(e));
+ const ovl=e=>e.c=="ds"&&e.cid&&cur.ev.some(q=>q.c=="work"&&e.s<q.e&&e.e>q.s);
  h+=bl.map((e,ix)=>{const hp=(e.e-e.s)*PX,cp=hp<50,tm=fmt(e.s)+"–"+fmt(e.e),nm=`${{ok:"✅ ",ko:"🟠 ",miss:"🔴 "}[runState(e.key)]||""}${e.rec?"🔁 ":""}${ICON[e.c]||""} ${esc(e.nm||e.t)}`;
-  return `<div class="bl ${e.c}${S.done[e.key]?" done":""}${runState(e.key)?" rs rs-"+runState(e.key):""}${ovl(e)?" ovr":""}${cp?" cp":""}${isPast(e)?" past":""}" data-b="${ix}"${e.cid?` data-cid="${e.cid}"`:""} style="${e.col?"--sc:"+e.col+";":""}${ovl(e)?"z-index:4;":(e.cid&&placed.some(q=>e.s<q.e&&e.e>q.s))?"left:52%;z-index:2;":""}top:${(e.s-H0)*PX+2}px;height:${Math.max(hp-6,20)}px">${CK[e.c]?`<input type="checkbox" data-k="${e.key}" ${S.done[e.key]?"checked":""}>`:""}<div class="bt">${cp?`<span class="nm">${nm}</span><span class="tm">${tm}</span>`:`${e.tag?`<span class="tg">${esc(e.tag)}</span>`:""}<span class="nm">${nm}</span><span class="tm">${tm}</span>${e.desc?`<span class="dc">${esc(e.desc)}</span>`:""}`}</div>${e.cid?`<span class="x" data-x="${e.cid}" title="Supprimer">✕</span><span class="rz"></span>`:""}</div>`}).join("");
+  return `<div class="bl ${e.c}${S.done[e.key]?" done":""}${runState(e.key)?" rs rs-"+runState(e.key):""}${ovl(e)?" ovr":""}${cp?" cp":""}${!cp&&hp<100?" md":""}${isPast(e)?" past":""}" data-b="${ix}"${e.cid?` data-cid="${e.cid}"`:""} style="${e.col?"--sc:"+e.col+";":""}${ovl(e)?"z-index:4;":(e.cid&&placed.some(q=>e.s<q.e&&e.e>q.s))?"left:52%;z-index:2;":""}top:${(e.s-H0)*PX+2}px;height:${Math.max(hp-6,20)}px">${CK[e.c]?`<input type="checkbox" data-k="${e.key}" ${S.done[e.key]?"checked":""}>`:""}<div class="bt">${cp?`<span class="nm">${nm}</span><span class="tm">${tm}</span>`:`${e.tag?`<span class="tg">${esc(e.tag)}</span>`:""}<span class="nm">${nm}</span><span class="tm">${tm}</span>${e.desc?`<span class="dc">${esc(e.desc)}</span>`:""}`}</div>${e.cid?`<span class="x" data-x="${e.cid}" title="Supprimer">✕</span><span class="rz"></span>`:""}</div>`}).join("");
  h+=`</div>`;
  const subs=[...new Set([...S.subjects,...S.ds.map(x=>x.subj)])];
  h+=`</div><aside class="pal"><h3>Je place…</h3><div class="seg">${[["devoir","📝 Devoirs"],["ctrl","🧪 Contrôle"]].map(x=>`<button data-t="${x[0]}" class="${ptype==x[0]?"on":""}">${x[1]}</button>`).join("")}</div><h3 class="h3b">Matière</h3><div class="chips">`+subs.map(m=>`<button class="chip${pick==m?" on":""}" data-m="${esc(m)}" style="--c:${subjCol(m)}">${esc(m)}</button>`).join("")+`</div><h3 class="h3b">🎾 Tennis</h3><div class="chips"><button class="chip${pick=="@ten"?" on":""}" data-m="@ten" style="--c:#20c997">🎾 Entraînement</button><button class="chip${pick=="@match"?" on":""}" data-m="@match" style="--c:#f08c00">🏆 Match</button></div><label class="dl">Durée <select id="dur">${[.5,1,1.5,2,3].map(x=>`<option value="${x}"${x==dur?" selected":""}>${hh(x)}</option>`).join("")}</select></label><label class="dl">Répéter <select id="rcs">${[["","Une fois"],["d","Tous les jours"],["w","Chaque semaine"],["m","Chaque mois"]].map(x=>`<option value="${x[0]}"${x[0]==recv?" selected":""}>${x[1]}</option>`).join("")}</select></label><div class="hint">${pick?"👆 Clique sur la frise à l'heure voulue pour placer <b>"+esc(SP[pick]||(TL[ptype]+" · "+pick))+"</b>, ou écris dans la case ci-dessous":"Choisis un type (devoirs ou contrôle) et une matière, puis clique sur la frise, ou écris dans la case ci-dessous : le bloc se place tout seul."}</div><div class="hint">💡 Glisse une matière avec la souris : sur la frise pour la poser à l'heure voulue, ou sur un jour en haut pour la placer ce jour-là. Glisse un bloc posé pour le déplacer (ou sur un jour pour changer sa date) ; Échap annule.</div><div class="qa"><input id="qt" placeholder="Écris-le ici (ex : exercices 12 à 15, à 17h)" value="${esc(qtv)}"><button id="qb">Ajouter</button></div><div class="addm"><input id="nm" placeholder="Autre matière"><button id="am">+</button></div></aside>${pOpen&&innerWidth<=900?`<div class="pbk"></div>`:""}</div>`;
@@ -742,7 +748,7 @@ function openMd(e){
  const ev=e.cid?S.ev.find(x=>String(x.id)==String(e.cid)):null,m=$("md");
  let kk=ev?(ev.k||(ev.m?"subj":"perso")):"";if(kk=="subj")kk="devoir";
  m.innerHTML=`<div class="mc"><h3>${esc((e.tag?e.tag+" · ":"")+(e.nm||e.t))}</h3><div class="mt">${fmt(e.s)} → ${fmt(e.e)}${ev?"":" · bloc de ton emploi du temps"}</div>${!ev&&e.t&&e.t!=(e.nm||"")?`<div class="mfull">${esc(e.t)}</div>`:""}
- ${ev?`<div class="mrow"><label>Type<select id="mk">${[["devoir","📝 Devoirs"],["ctrl","🧪 Contrôle"],["ten","🎾 Entraînement tennis"],["match","🏆 Match de tennis"]].map(x=>`<option value="${x[0]}"${x[0]==kk?" selected":""}>${x[1]}</option>`).join("")}</select></label><label>Matière / titre<input id="mn" value="${esc(ev.title.replace(/^Contrôle /,""))}"></label></div>
+ ${ev?`<div class="mrow"><label>Type<select id="mk">${[["devoir","📝 Devoirs"],["ctrl","🧪 Contrôle"],["ten","🎾 Entraînement tennis"],["match","🏆 Match de tennis"],["duo","🦉 Duolingo"]].map(x=>`<option value="${x[0]}"${x[0]==kk?" selected":""}>${x[1]}</option>`).join("")}</select></label><label>Matière / titre<input id="mn" value="${esc(ev.title.replace(/^Contrôle /,""))}"></label></div>
  <div class="mrow"><label>${ev.rec?"Première date":"Jour"}<input id="mdt" type="date" value="${ev.date}"></label><label>🔁 Récurrence<select id="mrec">${[["","Aucune"],["d","Tous les jours"],["w","Toutes les semaines"],["m","Tous les mois"]].map(x=>`<option value="${x[0]}"${x[0]==(ev.rec||"")?" selected":""}>${x[1]}</option>`).join("")}</select></label></div>
  <div class="mrow"><label>Début<input id="ms" type="time" value="${hmm(T(ev.s))}"></label><label>Fin<input id="me" type="time" value="${hmm(T(ev.e))}"></label></div>`:""}
  ${ev?"":`<div class="mrow"><label>Début<input id="ms" type="time" value="${hmm(e.s)}"></label><label>Fin<input id="me" type="time" value="${hmm(e.e)}"></label></div>`}
