@@ -243,6 +243,8 @@ body.dragging,body.dragging *{cursor:grabbing!important;user-select:none!importa
 .chip,.bl{-webkit-touch-callout:none}
 .chip{touch-action:none}
 @media(pointer:coarse){.bl .x{display:none}}
+.mbtn .miss{border-color:#ff6b6b;color:#ff6b6b}
+.ss .rb{background:none;border:1px solid var(--bd);color:var(--mu);border-radius:8px;padding:2px 8px;cursor:pointer;margin-left:6px;font-size:13px}
 </style></head><body>
 <div id="toast"></div>
 <div id="md" hidden></div>
@@ -273,7 +275,7 @@ let S={ds:[],flip:false},off=0;
 try{const r=localStorage.getItem("plan-v1");if(r)S=JSON.parse(r)}catch(e){}
 function normS(){S.hid=S.hid||{};S.hidR=S.hidR||{};S.ov=S.ov||{};S.res=S.res||{};S.done=S.done||{};S.ev=S.ev||[];S.run=S.run||{start:"2026-11-09"};S.rem=S.rem||{d1:false};S.notes=S.notes||{};S.grades=S.grades||{};S.coef=S.coef||{};
 if(!S.sv2){S.sv2=1;const B=["Maths","Physique-Chimie","Français","Anglais","Espagnol","Histoire-Géo","SVT","Enseignement scientifique"];S.subjects=B.concat((S.subjects||[]).filter(x=>!B.includes(x)&&x!="Philosophie"))}
-S.subjects=S.subjects||["Maths","Physique-Chimie","Français","Anglais","Histoire-Géo","SVT","Philosophie","Espagnol"];if(!S.vacs)S.vacs=[];if(!S.noSeed&&!S.vacs.some(v=>v.id=="toussaint"))S.vacs.push({id:"toussaint",name:"Vacances scolaires",a:"2026-10-19",b:"2026-11-01"});S.notified=S.notified||[];}normS();
+S.subjects=S.subjects||["Maths","Physique-Chimie","Français","Anglais","Histoire-Géo","SVT","Philosophie","Espagnol"];if(!S.vacs)S.vacs=[];if(!S.noSeed&&!S.vacs.some(v=>v.id=="toussaint"))S.vacs.push({id:"toussaint",name:"Vacances scolaires",a:"2026-10-19",b:"2026-11-01"});[{id:"noel",name:"Vacances de Noël",a:"2026-12-21",b:"2027-01-03"},{id:"hiver",name:"Vacances d'hiver",a:"2027-02-15",b:"2027-02-28"},{id:"printemps",name:"Vacances de printemps",a:"2027-04-12",b:"2027-04-25"}].forEach(v=>{if(!S.noSeed&&!S.vacs.some(x=>x.id==v.id))S.vacs.push(v)});S.notified=S.notified||[];}normS();
 // ===== SYNCHRO SUPABASE (sans connexion : une seule ligne "oscar") =====
 const SB="https://eoiylihotdwlcesumgox.supabase.co/rest/v1/planning_state",SBK="sb_publishable_-L-wByCrupoK7sHbu123ig_wz75sHU7",SBH={apikey:SBK,"Content-Type":"application/json"};
 let pushT=0,pushing=false,again=false,pulling=false;
@@ -358,7 +360,7 @@ function fixed(dow,A,vac,d){
  4:[A?["6:00","7:00",`Allure 10 km : 4'00"/km`,"run"]:["7:00","8:00",`Allure 10 km : 4'00"/km`,"run"],["19:00","20:30","Entraînement","trn"]],
  5:[["17:00","18:30","Entraînement","trn"]],
  6:[["9:00","10:15","Footing facile zone 2","run"],["17:00","18:30","Entraînement","trn"]]}[dow];
- const L=E.filter(e=>!(vac&&(e[3]=="ten"||e[3]=="trn"))).map(e=>({s:T(e[0]),e:T(e[1]),t:e[2],c:e[3]}));
+ const L=E.filter(e=>!(vac&&(e[3]=="ten"||e[3]=="trn"))&&!(e[3]=="run"&&S.run&&S.run.start&&d<pdate(S.run.start))).map(e=>({s:T(e[0]),e:T(e[1]),t:e[2],c:e[3]}));
  if(vac)L.forEach(e=>{if(e.c=="run"&&(dow==2||dow==4)){e.s=9;e.e=10}});
  const rt=runTxt(d);if(rt)L.forEach(e=>{if(e.c=="run"){e.t=rt;if(rt.startsWith("🏁")){e.s=9.5;e.e=10.5}}});
  if(!vac){
@@ -418,6 +420,7 @@ function evFor(d,out){
   for(const [a1,b1] of taken){if(a1-c>.24)gaps.push([c,a1]);c=Math.max(c,b1)}if(e0-c>.24)gaps.push([c,e0]);
   gaps.forEach(([a1,b1])=>ev.push({s:a1,e:b1,t:`📝 Devoirs (${hh(b1-a1)}) · à définir`,c:"dev",nm:"À définir",tag:"DEVOIRS ("+hh(b1-a1)+")"}))}
  S.ev.filter(x=>occurs(x,k)).forEach(x=>{const kk=x.k||(x.m?"subj":"perso"),M=KM[kk]||KM.perso,ti=x.title.replace(/^Contrôle /,"");ev.push({s:T(x.s),e:T(x.e),t:evLbl(x),c:M[2],cid:x.id,rec:x.rec,nm:ti,tag:M[1].toUpperCase(),desc:x.desc||"",col:["subj","devoir","ctrl"].includes(kk)?subjCol(ti):null})});
+ ev.filter(c=>c.c=="ds"&&c.cid).forEach(c=>{let best=null,bo=0;ev.forEach(w=>{if(w.c=="work"&&w.tag=="COURS"){const o=Math.min(w.e,c.e)-Math.max(w.s,c.s);if(o>bo&&o>=.5*(c.e-c.s)){bo=o;best=w}}});if(best){c.s=best.s;c.e=best.e}});
  const pi=prepInfo(d,ev.last);if(pi)ev.push({s:pi.s,e:pi.s+.25,t:"Prépa 15 min : "+pi.short,c:"pre",nm:"Prépa · "+pi.n+" + 20 pompes · gainage 2'"});
  ev.forEach(e=>{e.key=k+"|"+(+e.s).toFixed(2)+"|"+e.c;if(!e.desc&&S.notes[e.key])e.desc=S.notes[e.key]});
  const vis=ev.filter(e=>e.cid||e.all||!(S.hid[e.key]||S.hidR[rkey(e,i)]));
@@ -704,7 +707,7 @@ function renderRun(){
   h+=`<div class="wk${nows>=ws&&nows<=we?" cur":""}"><div class="wh"><b>Semaine ${w+1}</b><span>${fm(ws)} → ${fm(we)}</span><em>${RUN[w].th} · ≈ ${RUN[w].km} km</em></div>`;
   [["Mar",1],["Mer",2],["Ven",4],["Dim",6]].forEach((x,i)=>{
    const d=new Date(ws);d.setDate(ws.getDate()+x[1]);const ev=evFor(d,out).find(e=>e.c=="run"),key=ev?ev.key:"",dn1=key&&S.done[key];tot++;if(dn1)dn++;const rs0=key?runState(key):"";if(rs0=="ok")cok++;else if(rs0=="ko")cko++;else if(rs0=="miss")cmi++;
-   h+=`<label class="ss${rs0?" r-"+rs0:""}${w==7&&i==3?" race":""}"><input type="checkbox" data-rk="${key}" ${dn1?"checked":""}><span class="dd">${x[0]} ${d.getDate()}/${d.getMonth()+1}${ev?" · "+fmt(ev.s):""}</span><span class="tx">${esc(RUN[w].s[i])}</span><span class="st">${{ok:"✅ réussie",ko:"🟠 ratée",miss:"🔴 manquée"}[rs0]||""}</span></label>`});
+   h+=`<label class="ss${rs0?" r-"+rs0:""}${w==7&&i==3?" race":""}"><input type="checkbox" data-rk="${key}" ${dn1?"checked":""}><span class="dd">${x[0]} ${d.getDate()}/${d.getMonth()+1}${ev?" · "+fmt(ev.s):""}</span><span class="tx">${esc(RUN[w].s[i])}</span><span class="st">${{ok:"✅ réussie",ko:"🟠 ratée",miss:"🔴 manquée"}[rs0]||""}</span><button class="rb" data-rb="${key}" title="Résultat de la séance">✎</button></label>`});
   h+=`</div>`}
  el.innerHTML=`<div class="rh"><h2>🏁 Objectif : 10 km en moins de 38 min</h2>
  <div>Allure cible <b>3'47–3'48/km</b> (≈ 83 % de ta VMA de 19 km/h) · plan de 8 semaines basé sur ta semaine type (mar · mer · ven · dim).</div>
@@ -714,21 +717,25 @@ function renderRun(){
  `<div class="note">Séances de vitesse et d'allure : 15 min d'échauffement (footing + gammes + 3 lignes droites) puis 10 min de retour au calme. Allures et chrono indicatifs : si une semaine est trop dure, répète-la plutôt que de forcer. Les cases sont les mêmes que dans le planning.</div>`;
  el.querySelectorAll("[data-rk]").forEach(c=>c.onchange=()=>{const k=c.dataset.rk;if(!k){c.checked=false;return}toggleDone(k,c.checked,()=>{renderRun();render()})});
  $("rs").onchange=()=>{if(!$("rs").value)return;const d=pdate($("rs").value);d.setDate(d.getDate()-dowOf(d));S.run.start=F(d);save();renderRun()};
+ el.querySelectorAll("[data-rb]").forEach(bn=>bn.onclick=ev=>{ev.preventDefault();ev.stopPropagation();if(!bn.dataset.rb)return;askRes(bn.dataset.rb,()=>{renderRun();render()},true)});
 }
 
 const hmm=h=>p(Math.floor(h+1e-6))+":"+p(Math.round((h%1)*60));
 let pend=null;
 function closeMd(){$("md").hidden=true;if(pend){const p=pend;pend=null;delete S.done[p.key];save();p.after()}}
 function isPlanRun(key){const p=key.split("|");if(p[2]!="run"||!S.run||!S.run.start)return false;const df=Math.round((pdate(p[0])-pdate(S.run.start))/864e5);return df>=0&&df<56}
-function runState(key){if(!isPlanRun(key))return"";const r=S.res[key];if(S.done[key])return r||"ok";return key.split("|")[0]<F(new Date())?"miss":""}
-function askRes(key,after){
+function runState(key){if(!isPlanRun(key))return"";const r=S.res[key];if(r=="miss")return"miss";if(S.done[key])return r||"ok";return key.split("|")[0]<F(new Date())?"miss":""}
+function askRes(key,after,edit){
  const m=$("md"),d=pdate(key.split("|")[0]),w=Math.floor(Math.round((midnight(d)-pdate(S.run.start))/864e5)/7)+1;
- pend={key,after};
- m.innerHTML=`<div class="mc"><h3>🏁 Séance terminée !</h3><div class="mt">Semaine ${w} · ${JOURS[dowOf(d)]} ${d.getDate()} ${MS[d.getMonth()]}</div><div class="mfull">Tu as réussi la séance ?</div>
- <div class="mbtn big"><button id="rko" class="ko">🟠 Pas réussie</button><button id="rok" class="pri okb">✅ Réussie</button></div><div class="mbtn"><button id="rcn">Annuler (je ne l'ai pas faite)</button></div></div>`;
+ if(!edit)pend={key,after};
+ m.innerHTML=`<div class="mc"><h3>${edit?"🏁 Résultat de la séance":"🏁 Séance terminée !"}</h3><div class="mt">Semaine ${w} · ${JOURS[dowOf(d)]} ${d.getDate()} ${MS[d.getMonth()]}</div><div class="mfull">${edit?"Comment s'est passée la séance ?":"Tu as réussi la séance ?"}</div>
+ <div class="mbtn big"><button id="rko" class="ko">🟠 Pas réussie</button><button id="rok" class="pri okb">✅ Réussie</button></div>
+ <div class="mbtn big"><button id="rms" class="miss">🔴 Manquée</button>${edit?`<button id="rrz">↺ Effacer</button>`:""}<button id="rcn">${edit?"Fermer":"Annuler"}</button></div></div>`;
  m.hidden=false;
- const fin=v=>{S.res[key]=v;S.done[key]=1;pend=null;save();m.hidden=true;after()};
- $("rok").onclick=()=>fin("ok");$("rko").onclick=()=>fin("ko");$("rcn").onclick=()=>closeMd();
+ const fin=v=>{pend=null;if(v=="ok"||v=="ko"){S.res[key]=v;S.done[key]=1}else if(v=="miss"){S.res[key]="miss";delete S.done[key]}else{delete S.res[key];delete S.done[key]}save();m.hidden=true;after()};
+ $("rok").onclick=()=>fin("ok");$("rko").onclick=()=>fin("ko");$("rms").onclick=()=>fin("miss");
+ if($("rrz"))$("rrz").onclick=()=>fin("");
+ $("rcn").onclick=()=>closeMd();
 }
 function toggleDone(key,on,after){
  if(!on){delete S.done[key];delete S.res[key];save();after();return}
@@ -755,10 +762,11 @@ function openMd(e){
  <label>Description${ev?"":" (note perso)"}<textarea id="mdsc" rows="3" placeholder="Ex : exercices 12 à 15 p. 84, à rendre jeudi">${esc(ev?ev.desc||"":S.notes[e.key]||"")}</textarea></label>
  ${ev?`<label>Heures de travail à répartir avant (pour un contrôle, optionnel)<input id="mh" type="number" min="0" step="0.5" value="${+ev.h||0}"></label>`:""}
  <div id="mer" class="warn"></div>
- <div class="mbtn">${ev?(ev.rec?`<button id="mdo" class="danger">🗑 Cette fois</button><button id="mdel" class="danger" style="margin-right:0">🗑 Toute la série</button>`:`<button id="mdel" class="danger">🗑 Supprimer</button>`):(e.key&&!e.all?`<button id="mh1" class="danger">🗑 Supprimer ce jour</button><button id="mh2" class="danger" style="margin-right:0">🗑 Supprimer tous les ${JOURS[dowOf(pdate(e.key.split("|")[0]))]}s</button>`:"")}${!ev&&e.os!=null?`<button id="mrs">↺ Heure d'origine</button>`:""}<button id="mcl">Fermer</button><button id="msv" class="pri">Enregistrer</button></div></div>`;
+ <div class="mbtn">${ev?(ev.rec?`<button id="mdo" class="danger">🗑 Cette fois</button><button id="mdel" class="danger" style="margin-right:0">🗑 Toute la série</button>`:`<button id="mdel" class="danger">🗑 Supprimer</button>`):(e.key&&!e.all?`<button id="mh1" class="danger">🗑 Supprimer ce jour</button><button id="mh2" class="danger" style="margin-right:0">🗑 Supprimer tous les ${JOURS[dowOf(pdate(e.key.split("|")[0]))]}s</button>`:"")}${!ev&&e.os!=null?`<button id="mrs">↺ Heure d'origine</button>`:""}${!ev&&e.key&&isPlanRun(e.key)?`<button id="mres">🏁 Résultat</button>`:""}<button id="mcl">Fermer</button><button id="msv" class="pri">Enregistrer</button></div></div>`;
  m.hidden=false;
  $("mcl").onclick=closeMd;
  if($("mrs"))$("mrs").onclick=()=>{delete S.ov[e.key];save();closeMd();refresh()};
+ if($("mres"))$("mres").onclick=()=>{closeMd();askRes(e.key,refresh,true)};
  if($("mdo"))$("mdo").onclick=()=>{(ev.skip=ev.skip||[]).push(e.key.split("|")[0]);save();closeMd();refresh();msg("🗑️ Cette occurrence est supprimée, la série continue.")};
  if(ev)$("mdel").onclick=()=>{S.ev=S.ev.filter(q=>q!==ev);save();closeMd();refresh();msg("🗑️ Bloc supprimé.")};
  else if($("mh1")){const dk=e.key.split("|")[0],dw=dowOf(pdate(dk)),lb=(e.tag?e.tag+" · ":"")+(e.nm||e.t),hm=fmt(e.s)+"–"+fmt(e.e);
@@ -838,7 +846,7 @@ function renderNext(){
  const el=$("pgNext"),td=F(new Date()),{out,warn}=plan(),now=midnight(new Date());
  const rows=[];
  S.ev.filter(x=>x.date>=td||x.rec).forEach(x=>{const kk=x.k||(x.m?"subj":"perso");if(kk=="perso")return;const dt=x.date>=td&&occurs(x,x.date)?x.date:nextOcc(x,td);if(!dt)return;
-  const g=kk=="ctrl"?"ctrl":kk=="match"||kk=="ten"?"ten":"dev";if(avF!="all"&&avF!=g)return;
+  const g=kk=="ctrl"?"ctrl":kk=="match"||kk=="ten"?"ten":kk=="duo"?"duo":"dev";if(avF!="all"&&avF!=g)return;
   rows.push({date:dt,s:(x.s.length<5?"0":"")+x.s,x,kk})});
  if(avF=="all"||avF=="ctrl")S.ds.filter(x=>x.date>=td).forEach(x=>rows.push({date:x.date,s:"00:00",ds:x}));
  rows.sort((a,b)=>(a.date+a.s)<(b.date+b.s)?-1:1);
@@ -848,8 +856,8 @@ function renderNext(){
  rows.forEach(r=>{
   if(r.date!=last){last=r.date;const d=pdate(r.date),df=Math.round((d-now)/864e5);h+=`<h3 class="avh">${JOURS[dowOf(d)]} ${d.getDate()} ${MS[d.getMonth()]}${df==0?" · aujourd'hui":df==1?" · demain":" · dans "+df+" j"}</h3>`}
   if(r.ds){const x=r.ds;h+=`<div class="nxr ds"><div class="nxd"><span class="when">DS</span><b>🎯 ${esc(x.kind)} ${esc(x.subj)} · ${hh(x.h)}</b>${x.topic?`<i>${esc(x.topic)}</i>`:""}</div><button class="dx" data-dsx="${x.id}">✕</button></div>`;return}
-  const x=r.x,M=KM[r.kk]||KM.perso,key=r.date+"|"+T(x.s).toFixed(2)+"|"+M[2],dn=S.done[key];
-  h+=`<div class="nxr ${M[2]}${dn?" ok":""}" data-id="${x.id}" data-d="${r.date}"><input type="checkbox" data-ck="${key}" ${dn?"checked":""}><div class="nxd"><span class="when">${x.s}–${x.e}${x.rec?" · 🔁 "+RECL[x.rec]:""}</span><b>${esc(evLbl(x))}</b>${x.desc?`<i>${esc(x.desc)}</i>`:""}</div></div>`});
+  const x=r.x,M=KM[r.kk]||KM.perso,E0=evFor(pdate(r.date),out).find(q=>String(q.cid)==String(x.id)),key=E0?E0.key:r.date+"|"+T(x.s).toFixed(2)+"|"+M[2],ts=E0?fmt(E0.s):x.s,te=E0?fmt(E0.e):x.e,dn=S.done[key];
+  h+=`<div class="nxr ${M[2]}${dn?" ok":""}" data-id="${x.id}" data-d="${r.date}"><input type="checkbox" data-ck="${key}" ${dn?"checked":""}><div class="nxd"><span class="when">${ts}–${te}${x.rec?" · 🔁 "+RECL[x.rec]:""}</span><b>${esc(evLbl(x))}</b>${x.desc?`<i>${esc(x.desc)}</i>`:""}</div></div>`});
  if(!rows.length)h+=`<div class="note" style="margin-top:14px">Rien de prévu pour l'instant. Place un devoir, un contrôle ou un match depuis l'onglet Planning (bouton 🧩), il apparaîtra ici avec sa description.</div>`;
  h+=`<div class="note" style="margin-top:14px">Clique sur une ligne pour modifier la description ou supprimer. Les vacances sont visibles dans le bandeau du Planning.</div>`;
  el.innerHTML=h;
