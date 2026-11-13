@@ -245,6 +245,15 @@ body.dragging,body.dragging *{cursor:grabbing!important;user-select:none!importa
 @media(pointer:coarse){.bl .x{display:none}}
 .mbtn .miss{border-color:#ff6b6b;color:#ff6b6b}
 .ss .rb{background:none;border:1px solid var(--bd);color:var(--mu);border-radius:8px;padding:2px 8px;cursor:pointer;margin-left:6px;font-size:13px}
+.imp{margin-top:12px;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px}.imp summary{cursor:pointer;font-weight:600}.imp textarea{width:100%;margin-top:8px;background:rgba(255,255,255,.05);color:var(--tx);border:1px solid var(--bd);border-radius:10px;padding:8px;font:inherit;font-size:13px}.imp button{margin-top:8px;border:0;border-radius:10px;padding:9px 14px;color:#fff;font-weight:700;cursor:pointer;background:linear-gradient(135deg,var(--rev),var(--ds))}
+.mkb{background:rgba(124,92,255,.10);border:1px solid var(--bd);border-radius:14px;padding:10px;margin-bottom:12px}
+.mkb h3{margin:0 0 2px}.mkb label{display:block;font-size:12px;color:var(--mu);margin-top:8px}
+.mkb select,.mkb input{width:100%;margin-top:3px;background:rgba(255,255,255,.06);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px;font:inherit;font-size:13px;color-scheme:dark}
+.mkb .mrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mkb button{width:100%;margin-top:10px;border:0;border-radius:10px;padding:10px;color:#fff;font-weight:700;cursor:pointer;background:linear-gradient(135deg,var(--rev),var(--ds))}
+.mkb .hint2{font-size:11.5px;color:var(--mu);margin-top:6px}
+.mkb label,.mkb input,.mkb select{min-width:0;max-width:100%}.mkb input[type=time],.mkb input[type=date]{padding:6px 5px}
+@media(min-width:901px){.cols{grid-template-columns:minmax(0,1fr) 250px}}
 </style></head><body>
 <div id="toast"></div>
 <div id="md" hidden></div>
@@ -412,7 +421,7 @@ function plan(){
 }
 
 const CK={run:1,ten:1,trn:1,rev:1,pre:1,perso:1,ds:1,dev:1,duo:1};
-const KM={subj:["📝","Devoirs","dev"],devoir:["📝","Devoirs","dev"],ctrl:["🧪","Contrôle","ds"],match:["🏆","Match","ten"],ten:["🎾","Tennis","ten"],perso:["⭐","","perso"],duo:["🦉","","duo"]};
+const KM={subj:["📝","Devoirs","dev"],devoir:["📝","Devoirs","dev"],ctrl:["🧪","Contrôle","ds"],match:["🏆","Match","ten"],ten:["🎾","Tennis","ten"],perso:["📌","","perso"],duo:["🦉","","duo"]};
 const evLbl=x=>{const M=KM[x.k||(x.m?"subj":"perso")]||KM.perso;return M[0]+" "+(M[1]?M[1]+" · ":"")+x.title.replace(/^Contrôle /,"")};
 const isVac=d=>{const k=F(d);return S.vacs.some(v=>k>=v.a&&k<=v.b)};
 const slotsFor=d=>{const w=dowOf(d);return isVac(d)?[]:SLOTS[w]};
@@ -530,8 +539,8 @@ async function wpSync(){
 function courseAt(date,st,subj){
  const ev=evFor(pdate(date),plan().out).filter(e=>e.c=="work"&&e.tag=="COURS");
  return (st!=null?ev.find(e=>st>=e.s-1e-6&&st<e.e-1e-6):ev.find(e=>subj&&e.nm&&e.nm.toLowerCase()==String(subj).toLowerCase()))||null}
-function addAt(m,date,st){
- const tn=m=="@ten"||m=="@match",kk=m=="@ten"?"ten":m=="@match"?"match":ptype,ttl=tn?SP[m]:m,d=pdate(date);let s0=st,du=dur;
+function addAt(m,date,st,o){
+ o=o||{};const tn=m=="@ten"||m=="@match",kk=o.kk||(m=="@ten"?"ten":m=="@match"?"match":ptype),ttl=o.ttl||(tn?SP[m]:m),d=pdate(date);let s0=st,du=o.du||dur;
  if(kk=="ctrl"){const c=courseAt(date,st,ttl);if(c){s0=c.s;du=c.e-c.s}}
  if(s0==null){
   const nw=new Date(),nowH=date==F(nw)?nw.getHours()+nw.getMinutes()/60+.25:0,ev=evFor(d,plan().out).filter(e=>!e.all);
@@ -542,8 +551,38 @@ function addAt(m,date,st){
    s0=c+du<=22.75?c:null}
   if(s0==null)return null}
  const en=Math.min(s0+du,H1),id=Date.now()+Math.random();
- S.ev.push({id,title:ttl,k:kk,date,s:fmt(s0),e:fmt(en),m:kk=="subj"?1:0,desc:"",rec:recv});save();return{id,kk,ttl,s:s0,e:en,tn}}
+ S.ev.push({id,title:ttl,k:kk,date,s:fmt(s0),e:fmt(en),m:kk=="subj"?1:0,desc:o.desc||"",rec:o.rec!=null?o.rec:recv});save();return{id,kk,ttl,s:s0,e:en,tn}}
 const subjCol=t=>{let h=0;for(const c of String(t).toLowerCase())h=(h*31+c.charCodeAt(0))%360;return`hsl(${h} 62% 42%)`};
+const mk={t:"devoir",s:"",a:"ten",title:"",desc:"",h:"",d:"",du:1,rec:""};
+function mkForm(subs){
+ const sel=(id,opts,v)=>`<select id="${id}">${opts.map(o=>`<option value="${esc(String(o[0]))}"${String(o[0])==String(v)?" selected":""}>${esc(o[1])}</option>`).join("")}</select>`;
+ const sub=mk.s&&subs.includes(mk.s)?mk.s:subs[0];
+ return `<div class="mkb"><h3>➕ Créer un bloc</h3>
+ <label>Type de bloc${sel("mkt",[["devoir","📝 Devoirs"],["ctrl","🧪 Contrôle"],["act","🎾 Tennis · Match · Duolingo"],["perso","📌 Autre"]],mk.t)}</label>
+ ${mk.t=="devoir"||mk.t=="ctrl"?`<label>Matière${sel("mks",subs.map(x=>[x,x]),sub)}</label>`:""}
+ ${mk.t=="act"?`<label>Activité${sel("mka",[["ten","🎾 Entraînement de tennis"],["match","🏆 Match de tennis"],["duo","🦉 Duolingo"]],mk.a)}</label>`:""}
+ ${mk.t=="perso"?`<label>Titre<input id="mkti" placeholder="Ex : Rendez-vous dentiste" value="${esc(mk.title)}"></label>`:""}
+ <label>Ce que tu veux écrire<input id="mkd" placeholder="Description (facultatif)" value="${esc(mk.desc)}"></label>
+ <label>Jour<input id="mkj" type="date" value="${mk.d||F(selD)}"></label>
+ <div class="mrow"><label>Heure<input id="mkh" type="time" value="${mk.h}"></label><label>Durée${sel("mku",[[.25,"15 min"],[.5,"30 min"],[1,"1 h"],[1.5,"1 h 30"],[2,"2 h"],[3,"3 h"]],mk.du)}</label></div>
+ <label>Répéter${sel("mkr",[["","Une fois"],["d","Tous les jours"],["w","Chaque semaine"],["m","Chaque mois"]],mk.rec)}</label>
+ <button id="mkgo">Ajouter le bloc</button><div class="hint2">Sans heure, le bloc se place tout seul (créneau devoirs, ou sur le cours pour un contrôle).</div></div>`}
+function mkBind(){
+ const on=(id,fn)=>{const e=$(id);if(e)e.oninput=e.onchange=fn};
+ on("mkt",()=>{mk.t=$("mkt").value;render()});on("mks",()=>mk.s=$("mks").value);on("mka",()=>mk.a=$("mka").value);
+ on("mkti",()=>mk.title=$("mkti").value);on("mkd",()=>mk.desc=$("mkd").value);on("mkj",()=>mk.d=$("mkj").value);on("mkh",()=>mk.h=$("mkh").value);
+ on("mku",()=>mk.du=+$("mku").value);on("mkr",()=>mk.rec=$("mkr").value);
+ $("mkgo").onclick=mkGo}
+function mkGo(){
+ let kk,ttl;
+ if(mk.t=="devoir"||mk.t=="ctrl"){kk=mk.t;ttl=mk.s||(S.subjects[0]||"")}
+ else if(mk.t=="act"){kk=mk.a;ttl={ten:"Entraînement de tennis",match:"Match de tennis",duo:"Duolingo"}[mk.a]}
+ else{kk="perso";ttl=(mk.title||"").trim();if(!ttl)return msg("Écris un titre pour ton bloc « Autre ».")}
+ const date=mk.d||F(selD),st=mk.h?T(mk.h):null;
+ const r=addAt(null,date,st,{kk,ttl,du:+mk.du||1,rec:mk.rec,desc:(mk.desc||"").trim()});
+ if(!r)return msg("Pas de créneau libre ce jour-là : choisis une heure ou un autre jour.");
+ const rc=mk.rec;mk.desc="";mk.title="";mk.h="";mk.d="";mk.rec="";selD=pdate(date);render();
+ msg("✅ "+(kk=="devoir"||kk=="ctrl"?TL[kk]+" · ":"")+r.ttl+" ajouté le "+dayLbl(date)+" de "+fmt(r.s)+" à "+fmt(r.e)+(rc?" (🔁 répété)":"")+".")}
 function render(){
  if(!S.duoSeeded&&meta().ts){S.duoSeeded=1;if(!S.ev.some(x=>x.id=="duo1"))S.ev.push({id:"duo1",title:"Duolingo",k:"duo",date:F(midnight(new Date())),s:"18:30",e:"18:45",m:0,desc:"",rec:""})}
  const now=midnight(new Date()),mon=new Date(selD);mon.setDate(selD.getDate()-dowOf(selD));sel=dowOf(selD);
@@ -579,7 +618,7 @@ function render(){
   return `<div class="bl ${e.c}${S.done[e.key]?" done":""}${runState(e.key)?" rs rs-"+runState(e.key):""}${ovl(e)?" ovr":""}${cp?" cp":""}${!cp&&hp<100?" md":""}${isPast(e)?" past":""}" data-b="${ix}"${e.cid?` data-cid="${e.cid}"`:""} style="${e.col?"--sc:"+e.col+";":""}${ovl(e)?"z-index:4;":(e.cid&&placed.some(q=>e.s<q.e&&e.e>q.s))?"left:52%;z-index:2;":""}top:${(e.s-H0)*PX+2}px;height:${Math.max(hp-6,20)}px">${CK[e.c]?`<input type="checkbox" data-k="${e.key}" ${S.done[e.key]?"checked":""}>`:""}<div class="bt">${cp?`<span class="nm">${nm}</span><span class="tm">${tm}</span>`:`${e.tag?`<span class="tg">${esc(e.tag)}</span>`:""}<span class="nm">${nm}</span><span class="tm">${tm}</span>${e.desc?`<span class="dc">${esc(e.desc)}</span>`:""}`}</div>${e.cid?`<span class="x" data-x="${e.cid}" title="Supprimer">✕</span><span class="rz"></span>`:""}</div>`}).join("");
  h+=`</div>`;
  const subs=[...new Set([...S.subjects,...S.ds.map(x=>x.subj)])];
- h+=`</div><aside class="pal"><h3>Je place…</h3><div class="seg">${[["devoir","📝 Devoirs"],["ctrl","🧪 Contrôle"]].map(x=>`<button data-t="${x[0]}" class="${ptype==x[0]?"on":""}">${x[1]}</button>`).join("")}</div><h3 class="h3b">Matière</h3><div class="chips">`+subs.map(m=>`<button class="chip${pick==m?" on":""}" data-m="${esc(m)}" style="--c:${subjCol(m)}">${esc(m)}</button>`).join("")+`</div><h3 class="h3b">🎾 Tennis</h3><div class="chips"><button class="chip${pick=="@ten"?" on":""}" data-m="@ten" style="--c:#20c997">🎾 Entraînement</button><button class="chip${pick=="@match"?" on":""}" data-m="@match" style="--c:#f08c00">🏆 Match</button></div><label class="dl">Durée <select id="dur">${[.5,1,1.5,2,3].map(x=>`<option value="${x}"${x==dur?" selected":""}>${hh(x)}</option>`).join("")}</select></label><label class="dl">Répéter <select id="rcs">${[["","Une fois"],["d","Tous les jours"],["w","Chaque semaine"],["m","Chaque mois"]].map(x=>`<option value="${x[0]}"${x[0]==recv?" selected":""}>${x[1]}</option>`).join("")}</select></label><div class="hint">${pick?"👆 Clique sur la frise à l'heure voulue pour placer <b>"+esc(SP[pick]||(TL[ptype]+" · "+pick))+"</b>, ou écris dans la case ci-dessous":"Choisis un type (devoirs ou contrôle) et une matière, puis clique sur la frise, ou écris dans la case ci-dessous : le bloc se place tout seul."}</div><div class="hint">💡 Glisse une matière avec la souris : sur la frise pour la poser à l'heure voulue, ou sur un jour en haut pour la placer ce jour-là. Glisse un bloc posé pour le déplacer (ou sur un jour pour changer sa date) ; Échap annule.</div><div class="qa"><input id="qt" placeholder="Écris-le ici (ex : exercices 12 à 15, à 17h)" value="${esc(qtv)}"><button id="qb">Ajouter</button></div><div class="addm"><input id="nm" placeholder="Autre matière"><button id="am">+</button></div></aside>${pOpen&&innerWidth<=900?`<div class="pbk"></div>`:""}</div>`;
+ h+=`</div><aside class="pal">${mkForm(subs)}<h3>Ou glisse une matière…</h3><div class="seg">${[["devoir","📝 Devoirs"],["ctrl","🧪 Contrôle"]].map(x=>`<button data-t="${x[0]}" class="${ptype==x[0]?"on":""}">${x[1]}</button>`).join("")}</div><h3 class="h3b">Matière</h3><div class="chips">`+subs.map(m=>`<button class="chip${pick==m?" on":""}" data-m="${esc(m)}" style="--c:${subjCol(m)}">${esc(m)}</button>`).join("")+`</div><h3 class="h3b">🎾 Tennis</h3><div class="chips"><button class="chip${pick=="@ten"?" on":""}" data-m="@ten" style="--c:#20c997">🎾 Entraînement</button><button class="chip${pick=="@match"?" on":""}" data-m="@match" style="--c:#f08c00">🏆 Match</button></div><label class="dl">Durée <select id="dur">${[.5,1,1.5,2,3].map(x=>`<option value="${x}"${x==dur?" selected":""}>${hh(x)}</option>`).join("")}</select></label><label class="dl">Répéter <select id="rcs">${[["","Une fois"],["d","Tous les jours"],["w","Chaque semaine"],["m","Chaque mois"]].map(x=>`<option value="${x[0]}"${x[0]==recv?" selected":""}>${x[1]}</option>`).join("")}</select></label><div class="hint">${pick?"👆 Clique sur la frise à l'heure voulue pour placer <b>"+esc(SP[pick]||(TL[ptype]+" · "+pick))+"</b>, ou écris dans la case ci-dessous":"Choisis un type (devoirs ou contrôle) et une matière, puis clique sur la frise, ou écris dans la case ci-dessous : le bloc se place tout seul."}</div><div class="hint">💡 Glisse une matière avec la souris : sur la frise pour la poser à l'heure voulue, ou sur un jour en haut pour la placer ce jour-là. Glisse un bloc posé pour le déplacer (ou sur un jour pour changer sa date) ; Échap annule.</div><div class="qa"><input id="qt" placeholder="Écris-le ici (ex : exercices 12 à 15, à 17h)" value="${esc(qtv)}"><button id="qb">Ajouter</button></div><div class="addm"><input id="nm" placeholder="Autre matière"><button id="am">+</button></div></aside>${pOpen&&innerWidth<=900?`<div class="pbk"></div>`:""}</div>`;
  const oldSt=g.querySelector(".strip"),stSL=oldSt?oldSt.scrollLeft:null;
  g.className="";g.innerHTML=h;
  g.querySelectorAll('input[data-k]').forEach(c=>c.onchange=()=>toggleDone(c.dataset.k,c.checked,refresh));
@@ -610,7 +649,7 @@ function render(){
    });
    go()})});
  g.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{ptype=b.dataset.t;render()});
- $("dur").onchange=()=>{dur=+$("dur").value};$("rcs").onchange=()=>{recv=$("rcs").value};$("qb").onclick=quickAdd;$("qt").oninput=()=>{qtv=$("qt").value};$("qt").onkeydown=e=>{if(e.key=="Enter")quickAdd()};
+ mkBind();$("dur").onchange=()=>{dur=+$("dur").value};$("rcs").onchange=()=>{recv=$("rcs").value};$("qb").onclick=quickAdd;$("qt").oninput=()=>{qtv=$("qt").value};$("qt").onkeydown=e=>{if(e.key=="Enter")quickAdd()};
  $("am").onclick=()=>{const v=$("nm").value.trim().slice(0,30);if(v&&!S.subjects.includes(v)){S.subjects.push(v);save()}if(v)pick=v;render()};
  g.querySelectorAll("[data-x]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();const sx=S.ev.find(q=>String(q.id)==x.dataset.x);if(sx&&sx.rec){openMd(bl[+x.closest(".bl").dataset.b]);return}S.ev=S.ev.filter(q=>String(q.id)!=x.dataset.x);save();render()});
  g.querySelectorAll(".bl").forEach(b=>b.onclick=ev=>{if(Date.now()-dragged<400||ev.target.closest("input")||ev.target.closest(".x"))return;openMd(bl[+b.dataset.b])});
@@ -699,7 +738,7 @@ function checkReminders(){
    if(S.rem.d1&&e.cid&&(e.c=="dev"||e.c=="ds"||e.tag=="MATCH")&&mins<=1440)fire(e.key+"|j1",(o?"Demain à ":"Aujourd'hui à ")+fmt(e.s)+" : "+e.t);
   }}
 }
-setInterval(()=>{const a=document.activeElement;if(!(a&&a.id=="qt")&&!busy)render()},60000);setInterval(checkReminders,30000);checkReminders();
+setInterval(()=>{const a=document.activeElement;if(!(a&&(a.id=="qt"||/^mk/.test(a.id||"")))&&!busy)render()},60000);setInterval(checkReminders,30000);checkReminders();
 const syncRem=()=>{S.rem=S.rem||{};$("d1").textContent="📆 Rappel la veille : "+(S.rem.d1?"activé":"désactivé");$("d1").classList.toggle("on",!!S.rem.d1);const g="Notification" in window&&Notification.permission=="granted";$("bell").textContent=g?"🔔 Rappels 1 h avant : activés":"🔔 Activer les rappels (1 h avant)";$("bell").classList.toggle("on",g)};
 const askN=async()=>{try{const r=await Notification.requestPermission();msg(r=="granted"?"🔔 Notifications activées. Garde l'appli ouverte : un message arrive 1 h avant chaque séance non cochée.":"Notifications refusées : un bandeau s'affichera dans la page à la place.")}catch(e){msg("Notifications indisponibles ici : un bandeau s'affichera dans la page (appli ouverte).")}syncRem()};
 $("bell").onclick=askN;
@@ -770,7 +809,7 @@ function openMd(e){
  const ev=e.cid?S.ev.find(x=>String(x.id)==String(e.cid)):null,m=$("md");
  let kk=ev?(ev.k||(ev.m?"subj":"perso")):"";if(kk=="subj")kk="devoir";
  m.innerHTML=`<div class="mc"><h3>${esc((e.tag?e.tag+" · ":"")+(e.nm||e.t))}</h3><div class="mt">${fmt(e.s)} → ${fmt(e.e)}${ev?"":" · bloc de ton emploi du temps"}</div>${!ev&&e.t&&e.t!=(e.nm||"")?`<div class="mfull">${esc(e.t)}</div>`:""}
- ${ev?`<div class="mrow"><label>Type<select id="mk">${[["devoir","📝 Devoirs"],["ctrl","🧪 Contrôle"],["ten","🎾 Entraînement tennis"],["match","🏆 Match de tennis"],["duo","🦉 Duolingo"]].map(x=>`<option value="${x[0]}"${x[0]==kk?" selected":""}>${x[1]}</option>`).join("")}</select></label><label>Matière / titre<input id="mn" value="${esc(ev.title.replace(/^Contrôle /,""))}"></label></div>
+ ${ev?`<div class="mrow"><label>Type<select id="mk">${[["devoir","📝 Devoirs"],["ctrl","🧪 Contrôle"],["ten","🎾 Entraînement tennis"],["match","🏆 Match de tennis"],["duo","🦉 Duolingo"],["perso","📌 Autre"]].map(x=>`<option value="${x[0]}"${x[0]==kk?" selected":""}>${x[1]}</option>`).join("")}</select></label><label>Matière / titre<input id="mn" value="${esc(ev.title.replace(/^Contrôle /,""))}"></label></div>
  <div class="mrow"><label>${ev.rec?"Première date":"Jour"}<input id="mdt" type="date" value="${ev.date}"></label><label>🔁 Récurrence<select id="mrec">${[["","Aucune"],["d","Tous les jours"],["w","Toutes les semaines"],["m","Tous les mois"]].map(x=>`<option value="${x[0]}"${x[0]==(ev.rec||"")?" selected":""}>${x[1]}</option>`).join("")}</select></label></div>
  <div class="mrow"><label>Début<input id="ms" type="time" value="${hmm(T(ev.s))}"></label><label>Fin<input id="me" type="time" value="${hmm(T(ev.e))}"></label></div>`:""}
  ${ev?"":`<div class="mrow"><label>Début<input id="ms" type="time" value="${hmm(e.s)}"></label><label>Fin<input id="me" type="time" value="${hmm(e.e)}"></label></div>`}
@@ -830,6 +869,23 @@ function paint(){
  R.querySelectorAll(".gr[data-g]").forEach(r=>{const g=(S.grades[S.subjects[+r.dataset.s]]||[]).find(x=>x.id==r.dataset.g);if(!g)return;const ri=rowInfo(g);r.className="gr "+ri.c;r.querySelector(".bd").textContent=ri.t});
  const G=genStats();$("gen").textContent=f1(G.A);$("gcmp").innerHTML=cmpHtml(G);$("ggoal").innerHTML=goalHtml(G.A,gGoal());gbar($("ggb"),G.A,gGoal());
 }
+function importNotes(txt){
+ const nz=t=>String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+ const AL={es:"Enseignement scientifique","ens scientifique":"Enseignement scientifique","enseignement scientifique":"Enseignement scientifique",hg:"Histoire-Géo","histoire geo":"Histoire-Géo",histoire:"Histoire-Géo",pc:"Physique-Chimie",physique:"Physique-Chimie","physique chimie":"Physique-Chimie",maths:"Maths",math:"Maths",mathematiques:"Maths",francais:"Français",anglais:"Anglais",espagnol:"Espagnol",svt:"SVT"};
+ const nm=v=>v==null||v===""?null:parseFloat(String(v).replace(",","."));
+ let added=0;const unk=[];
+ for(const line of String(txt).split(/\n+/)){
+  const m=line.match(/^\s*([^:\t]+?)\s*[:\t]\s*(.+)$/);if(!m)continue;
+  const key=nz(m[1]);let sub=S.subjects.find(x=>nz(x)==key)||AL[key];
+  if(!sub){unk.push(m[1].trim());continue}
+  if(!S.subjects.includes(sub))S.subjects.push(sub);
+  const re=/(\d+(?:[.,]\d+)?)(?:\s*\/\s*(\d+))?(?:\s*(?:coef|x|×)\s*(\d+(?:[.,]\d+)?))?(?:\s*(?:pr[ée]vu|prevu)\s*(\d+(?:[.,]\d+)?))?/gi;let g;
+  while((g=re.exec(m[2]))){
+   (S.grades[sub]=S.grades[sub]||[]).push({id:"g"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),t:nt,p:nm(g[4]),n:nm(g[1]),b:+g[2]||20,c:nm(g[3])||1});added++}
+ }
+ if(added)save();
+ return added?("✅ "+added+" note"+(added>1?"s":"")+" ajoutée"+(added>1?"s":"")+" au trimestre "+nt+(unk.length?" · matière inconnue ignorée : "+unk.join(", "):"")+"."):("Aucune note reconnue"+(unk.length?" (matière inconnue : "+unk.join(", ")+")":"")+". Format : « Maths : 15 12,5 17/20 ».")
+}
 function renderNotes(){
  const R=$("pgNotes");
  let h=`<div class="seg tq">${[1,2,3].map(t=>`<button data-nt="${t}" class="${nt==t?"on":""}">Trimestre ${t}</button>`).join("")}</div>`;
@@ -839,6 +895,9 @@ function renderNotes(){
   if(L.length)h+=`<div class="gr gh"><span>Prévu</span><span>Note</span><span>sur</span><span>Coef</span><span>Écart</span><span></span></div>`;
   h+=L.map(g=>`<div class="gr" data-g="${g.id}" data-s="${i}"><input data-f="p" inputmode="decimal" placeholder="prévu" value="${g.p==null?"":g.p}"><input data-f="n" inputmode="decimal" placeholder="note" value="${g.n==null?"":g.n}"><input data-f="b" inputmode="decimal" value="${g.b||20}"><input data-f="c" inputmode="decimal" value="${g.c||1}"><span class="bd"></span><button data-del="${g.id}" data-s="${i}">✕</button></div>`).join("");
   h+=`<button class="addg" data-add="${i}">+ Ajouter une note</button></div>`});
+ h+=`<details class="imp"><summary>📥 Ajouter plusieurs notes d'un coup (trimestre ${nt})</summary>
+ <textarea id="impt" rows="7" placeholder="Une matière par ligne :&#10;Maths : 15 12,5 17/20&#10;Français : 14 16 coef 2&#10;Anglais : 13 prévu 15&#10;ES : 17&#10;&#10;Sépare les notes par un espace. Options : /sur, coef 2, prévu 12"></textarea>
+ <button id="impb">Ajouter ces notes</button></details>`;
  h+=`<div class="addn"><input id="ns" placeholder="Nouvelle matière"><button id="nsb">+</button></div><div class="note">Écris la note que tu penses avoir dans « Prévu » avant le résultat, puis la vraie note dans « Note » : vert si tu fais mieux, rouge si tu fais moins bien. Les objectifs se règlent par trimestre : barre verte quand ta moyenne atteint l'objectif, rouge sinon.</div>`;
  R.innerHTML=h;paint();
 }
@@ -854,14 +913,15 @@ $("pgNotes").addEventListener("click",e=>{const t=e.target;
  if(t.dataset.nt){nt=+t.dataset.nt;renderNotes()}
  else if(t.dataset.add!=null){const sub=S.subjects[+t.dataset.add];(S.grades[sub]=S.grades[sub]||[]).push({id:"g"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),t:nt,p:null,n:null,b:20,c:1});save();renderNotes()}
  else if(t.dataset.del){const sub=S.subjects[+t.dataset.s];S.grades[sub]=(S.grades[sub]||[]).filter(x=>x.id!=t.dataset.del);save();renderNotes()}
+ else if(t.id=="impb"){const r=importNotes($("impt").value);renderNotes();msg(r)}
  else if(t.id=="nsb"){const v=$("ns").value.trim().slice(0,30);if(v&&!S.subjects.includes(v)){S.subjects.push(v);save();renderNotes()}}});
 
 let avF="all";
 function renderNext(){
  const el=$("pgNext"),td=F(new Date()),{out,warn}=plan(),now=midnight(new Date());
  const rows=[];
- S.ev.filter(x=>x.date>=td||x.rec).forEach(x=>{const kk=x.k||(x.m?"subj":"perso");if(kk=="perso")return;const dt=x.date>=td&&occurs(x,x.date)?x.date:nextOcc(x,td);if(!dt)return;
-  const g=kk=="ctrl"?"ctrl":kk=="match"||kk=="ten"?"ten":kk=="duo"?"duo":"dev";if(avF!="all"&&avF!=g)return;
+ S.ev.filter(x=>x.date>=td||x.rec).forEach(x=>{const kk=x.k||(x.m?"subj":"perso");const dt=x.date>=td&&occurs(x,x.date)?x.date:nextOcc(x,td);if(!dt)return;
+  const g=kk=="ctrl"?"ctrl":kk=="match"||kk=="ten"?"ten":kk=="duo"?"duo":kk=="perso"?"autre":"dev";if(avF!="all"&&avF!=g)return;
   rows.push({date:dt,s:(x.s.length<5?"0":"")+x.s,x,kk})});
  if(avF=="all"||avF=="ctrl")S.ds.filter(x=>x.date>=td).forEach(x=>rows.push({date:x.date,s:"00:00",ds:x}));
  rows.sort((a,b)=>(a.date+a.s)<(b.date+b.s)?-1:1);
