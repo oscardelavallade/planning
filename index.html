@@ -254,6 +254,17 @@ body.dragging,body.dragging *{cursor:grabbing!important;user-select:none!importa
 .mkb .hint2{font-size:11.5px;color:var(--mu);margin-top:6px}
 .mkb label,.mkb input,.mkb select{min-width:0;max-width:100%}.mkb input[type=time],.mkb input[type=date]{padding:6px 5px}
 @media(min-width:901px){.cols{grid-template-columns:minmax(0,1fr) 250px}}
+select{color-scheme:dark}
+select option,select optgroup{background:#1b1a2b;color:#f3f3fa}
+[data-theme="aube"] select{color-scheme:light}
+[data-theme="aube"] select option,[data-theme="aube"] select optgroup{background:#ffffff;color:#2b2540}
+.pp{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:14px;margin-bottom:12px}
+.pp h2{font-size:17px;margin:0 0 8px}.ppl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13.5px}
+.pp input{background:rgba(255,255,255,.06);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:6px;font:inherit;color-scheme:dark}
+.ppl button{border:0;border-radius:10px;padding:8px 12px;color:#fff;font-weight:700;cursor:pointer;background:linear-gradient(135deg,var(--run),var(--ds))}
+.ppn{margin:8px 0;color:var(--run);font-weight:600;font-size:13.5px}
+.pr{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;align-items:end;margin-top:8px;padding-top:8px;border-top:1px dashed var(--bd)}
+.pr b{grid-column:1/-1;font-size:13px}.pr label{font-size:11.5px;color:var(--mu)}.pr label input{width:100%;margin-top:3px}.pr .px{grid-column:1/-1}
 </style></head><body>
 <div id="toast"></div>
 <div id="md" hidden></div>
@@ -425,12 +436,17 @@ const KM={subj:["📝","Devoirs","dev"],devoir:["📝","Devoirs","dev"],ctrl:["�
 const evLbl=x=>{const M=KM[x.k||(x.m?"subj":"perso")]||KM.perso;return M[0]+" "+(M[1]?M[1]+" · ":"")+x.title.replace(/^Contrôle /,"")};
 const isVac=d=>{const k=F(d);return S.vacs.some(v=>k>=v.a&&k<=v.b)};
 const slotsFor=d=>{const w=dowOf(d);return isVac(d)?[]:SLOTS[w]};
-const PREP_START=new Date(2026,9,26),PT=[17.5,17.5,16.5,18.5,18.5,16.5,16.5];
+const PT=[17.5,17.5,16.5,18.5,18.5,16.5,16.5];
+const PCFG=[{n:50,w:20,g:2,x:""},{n:70,w:20,g:2,x:""},{n:80,w:20,g:2,x:""}];
+const prepStart=()=>S.prep&&S.prep.start?pdate(S.prep.start):new Date(2026,10,13);
+const prepCfg=i=>({...PCFG[Math.min(i,2)],...(((S.prep||{}).cfg||[])[Math.min(i,2)]||{})});
 function prepInfo(d,last){
- const w=Math.floor(Math.round((midnight(d)-PREP_START)/864e5)/7);if(w<0)return null;
- const n=w==0?50:w==1?70:80;
+ const w=Math.floor(Math.round((midnight(d)-prepStart())/864e5)/7);if(w<0)return null;
+ const c=prepCfg(w),P=[];
+ if(+c.n)P.push(c.n+" pompes");if(+c.w)P.push(c.w+" pompes bras écartés");if(+c.g)P.push(c.g+" min de gainage");if(c.x)P.push(c.x);
+ const nm="Prépa · "+[((+c.n||+c.w)?((+c.n||0)+(+c.w?" + "+c.w:"")+" pompes"):""),(+c.g?"gainage "+c.g+"'":""),c.x||""].filter(Boolean).join(" · ");
  const dw=dowOf(d),vc=isVac(d);let ps=PT[dw];if(vc&&[2,3,4].includes(dw))ps=17.5;else if(!vc&&dw<5&&last)ps=Math.ceil((last+.55)*4)/4;
- return{s:ps,n,w:w+1,short:n+" pompes + 20 écartées + 2' gainage",full:n+" pompes · 20 pompes bras écartés · 2 min de gainage"};
+ return{s:ps,n:c.n,w:w+1,short:P.join(" · ")||"à définir",full:P.join(" · ")||"à définir",nm}
 }
 function evFor(d,out){
  const i=dowOf(d),k=F(d),mon=new Date(d);mon.setDate(d.getDate()-i);
@@ -445,7 +461,7 @@ function evFor(d,out){
   gaps.forEach(([a1,b1])=>ev.push({s:a1,e:b1,t:`📝 Devoirs (${hh(b1-a1)}) · à définir`,c:"dev",nm:"À définir",tag:"DEVOIRS ("+hh(b1-a1)+")"}))}
  S.ev.filter(x=>occurs(x,k)).forEach(x=>{const kk=x.k||(x.m?"subj":"perso"),M=KM[kk]||KM.perso,ti=x.title.replace(/^Contrôle /,"");ev.push({s:T(x.s),e:T(x.e),t:evLbl(x),c:M[2],cid:x.id,rec:x.rec,nm:ti,tag:M[1].toUpperCase(),desc:x.desc||"",col:["subj","devoir","ctrl"].includes(kk)?subjCol(ti):null})});
  ev.filter(c=>c.c=="ds"&&c.cid).forEach(c=>{let best=null,bo=0;ev.forEach(w=>{if(w.c=="work"&&w.tag=="COURS"){const o=Math.min(w.e,c.e)-Math.max(w.s,c.s);if(o>bo&&o>=.5*(c.e-c.s)){bo=o;best=w}}});if(best){c.s=best.s;c.e=best.e}});
- const pi=prepInfo(d,ev.last);if(pi)ev.push({s:pi.s,e:pi.s+.25,t:"Prépa 15 min : "+pi.short,c:"pre",nm:"Prépa · "+pi.n+" + 20 pompes · gainage 2'"});
+ const pi=prepInfo(d,ev.last);if(pi)ev.push({s:pi.s,e:pi.s+.25,t:"Prépa 15 min : "+pi.short,c:"pre",nm:pi.nm});
  ev.forEach(e=>{e.key=k+"|"+(+e.s).toFixed(2)+"|"+e.c;if(!e.desc&&S.notes[e.key])e.desc=S.notes[e.key]});
  const vis=ev.filter(e=>e.cid||e.all||!(S.hid[e.key]||S.hidR[rkey(e,i)]));
  vis.forEach(e=>{const o=S.ov[e.key];if(o&&!e.cid&&!e.all){e.os=e.s;e.s=o.s;e.e=o.e}});
@@ -751,6 +767,14 @@ document.querySelectorAll("[data-th]").forEach(b=>b.onclick=()=>{S.theme=b.datas
 function go(p){page=p;["pgPlan","pgNext","pgRun","pgNotes"].forEach((id,i)=>$(id).hidden=p!=i+1);["nv1","nv2","nv3","nv4"].forEach((id,i)=>$(id).classList.toggle("on",p==i+1));$("fab").hidden=p!=1;if(p==1){needCenter=true;render()}else if(p==2)renderNext();else if(p==3)renderRun();else renderNotes()}
 $("nv1").onclick=()=>go(1);$("nv2").onclick=()=>go(2);$("nv3").onclick=()=>go(3);$("nv4").onclick=()=>go(4);
 const refresh=()=>{render();if(page==2)renderNext();if(page==3)renderRun()};
+function prepCard(){
+ const st=prepStart(),pi=prepInfo(new Date());
+ const row=(i,l)=>{const c=prepCfg(i);return `<div class="pr"><b>${l}</b><label>pompes<input data-pp="${i}.n" inputmode="numeric" value="${esc(String(c.n))}"></label><label>écartées<input data-pp="${i}.w" inputmode="numeric" value="${esc(String(c.w))}"></label><label>gainage (min)<input data-pp="${i}.g" inputmode="decimal" value="${esc(String(c.g))}"></label><label class="px">autre exercice (facultatif)<input data-pp="${i}.x" value="${esc(c.x||"")}" placeholder="Ex : 30 squats"></label></div>`};
+ return `<div class="pp"><h2>💪 Prépa physique (15 min par jour)</h2>
+ <div class="ppl">Commence le <input type="date" id="pps" value="${F(st)}"><button id="ppt">Recommencer aujourd'hui</button></div>
+ <div class="ppn">${pi?`Aujourd'hui : semaine ${pi.w} → ${esc(pi.full)}`:`Elle commence le ${st.getDate()}/${st.getMonth()+1}/${st.getFullYear()}`}</div>
+ ${row(0,"Semaine 1")}${row(1,"Semaine 2")}${row(2,"Semaine 3 et suivantes")}
+ <div class="note">Change chaque nombre à la main : le planning se met à jour tout de suite. Laisse un champ vide pour retirer l'exercice.</div></div>`}
 function renderRun(){
  const el=$("pgRun"),st=pdate(S.run.start||"2026-11-09"),{out}=plan(),nows=midnight(new Date()),fm=d=>d.getDate()+" "+MS[d.getMonth()];
  let tot=0,dn=0,w8="",cok=0,cko=0,cmi=0;
@@ -767,10 +791,14 @@ function renderRun(){
  <div>Allure cible <b>3'47–3'48/km</b> (≈ 83 % de ta VMA de 19 km/h) · plan de 8 semaines basé sur ta semaine type (mar · mer · ven · dim).</div>
  <div style="margin-top:8px">Début du plan (lundi) : <input type="date" id="rs" value="${S.run.start}"> · course le <b>${JOURS[6]} ${fm(race)} ${race.getFullYear()}</b></div>
  <div class="bar"><i style="width:${Math.round(100*dn/tot)}%"></i></div><small>${dn}/${tot} séances faites</small><div class="rsum"><b class="g">✅ ${cok} réussie${cok>1?"s":""}</b><b class="o">🟠 ${cko} ratée${cko>1?"s":""}</b><b class="r">🔴 ${cmi} manquée${cmi>1?"s":""}</b></div></div>
+ ${prepCard()}
  <div class="paces"><div><small>Footing zone 2</small><b>4'50–5'10/km</b></div><div><small>Allure 10 km</small><b>3'48/km</b><i>15,8 km/h</i></div><div><small>VMA 19 km/h</small><b>1'16" / 400 m</b><i>3'09/km</i></div><div><small>Récupération</small><b>1'15"–2' trot</b></div></div>`+h+
  `<div class="note">Séances de vitesse et d'allure : 15 min d'échauffement (footing + gammes + 3 lignes droites) puis 10 min de retour au calme. Allures et chrono indicatifs : si une semaine est trop dure, répète-la plutôt que de forcer. Les cases sont les mêmes que dans le planning.</div>`;
  el.querySelectorAll("[data-rk]").forEach(c=>c.onchange=()=>{const k=c.dataset.rk;if(!k){c.checked=false;return}toggleDone(k,c.checked,()=>{renderRun();render()})});
  $("rs").onchange=()=>{if(!$("rs").value)return;const d=pdate($("rs").value);d.setDate(d.getDate()-dowOf(d));S.run.start=F(d);save();renderRun()};
+ el.querySelectorAll("[data-pp]").forEach(i=>i.oninput=()=>{const [k,f]=i.dataset.pp.split(".");S.prep=S.prep||{};S.prep.cfg=S.prep.cfg||[{},{},{}];S.prep.cfg[+k]=S.prep.cfg[+k]||{};S.prep.cfg[+k][f]=f=="x"?i.value:i.value.replace(",",".");save();const pi=prepInfo(new Date()),q=el.querySelector(".ppn");if(q)q.textContent=pi?"Aujourd'hui : semaine "+pi.w+" → "+pi.full:q.textContent});
+ $("pps").onchange=()=>{if(!$("pps").value)return;S.prep=S.prep||{};S.prep.start=$("pps").value;save();renderRun()};
+ $("ppt").onclick=()=>{S.prep=S.prep||{};S.prep.start=F(midnight(new Date()));save();renderRun()};
  el.querySelectorAll("[data-rb]").forEach(bn=>bn.onclick=ev=>{ev.preventDefault();ev.stopPropagation();if(!bn.dataset.rb)return;askRes(bn.dataset.rb,()=>{renderRun();render()},true)});
 }
 
